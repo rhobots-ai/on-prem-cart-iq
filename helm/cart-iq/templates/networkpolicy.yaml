@@ -3,9 +3,9 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "insur-iq.fullname" . }}-default-deny
+  name: {{ include "cart-iq.fullname" . }}-default-deny
   labels:
-    {{- include "insur-iq.labels" . | nindent 4 }}
+    {{- include "cart-iq.labels" . | nindent 4 }}
 spec:
   podSelector: {}
   policyTypes: [Ingress, Egress]
@@ -15,9 +15,9 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "insur-iq.fullname" . }}-allow-ingress-app
+  name: {{ include "cart-iq.fullname" . }}-allow-ingress-app
   labels:
-    {{- include "insur-iq.labels" . | nindent 4 }}
+    {{- include "cart-iq.labels" . | nindent 4 }}
 spec:
   podSelector:
     matchExpressions:
@@ -32,9 +32,9 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "insur-iq.fullname" . }}-allow-egress
+  name: {{ include "cart-iq.fullname" . }}-allow-egress
   labels:
-    {{- include "insur-iq.labels" . | nindent 4 }}
+    {{- include "cart-iq.labels" . | nindent 4 }}
 spec:
   podSelector: {}
   policyTypes: [Egress]
@@ -66,7 +66,7 @@ spec:
       ports:
         - { port: 6379, protocol: TCP }
     {{- end }}
-    # HTTPS (S3, Secrets Manager, ECR, LLM APIs, Langfuse)
+    # HTTPS (S3, Secrets Manager, ECR, AI provider APIs, scraper targets)
     - to:
         - ipBlock: { cidr: 0.0.0.0/0 }
       ports:
@@ -75,5 +75,5 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              {{- include "insur-iq.selectorLabels" . | nindent 14 }}
+              {{- include "cart-iq.selectorLabels" . | nindent 14 }}
 {{- end }}

@@ -6,13 +6,14 @@
 # endpoint), optionally generates random app secrets, and groups everything
 # into the 5 JSON-shaped Secrets Manager entries consumed by ESO:
 #
-#   insur-iq/<env>/backend   SECRET_KEY, WEBHOOK_SECRET_KEY
-#   insur-iq/<env>/db        DB_HOST, DB_PORT, DB_USER, DB_PASSWORD,
-#                            DB_NAME, DB_NAME_AUTH, DATABASE_STRING_AUTH
-#   insur-iq/<env>/redis     CELERY_BROKER_URL
-#   insur-iq/<env>/auth      BETTER_AUTH_SECRET, WEBHOOK_SECRET_KEY, OAuth provider IDs/secrets
-#   insur-iq/<env>/llm       LLM_PROVIDER, GEMINI/OPENAI/ANTHROPIC_API_KEY+_MODEL,
-#                            GOOGLE_API_KEY, LANGFUSE_* keys
+#   cart-iq/<env>/backend   SECRET_KEY, WEBHOOK_SECRET_KEY
+#   cart-iq/<env>/db        DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME,
+#                            DB_NAME_AUTH, DATABASE_STRING_AUTH,
+#                            PARITY_CHAT_DB_USER, PARITY_CHAT_DB_PASSWORD
+#   cart-iq/<env>/redis     CELERY_BROKER_URL
+#   cart-iq/<env>/auth      BETTER_AUTH_SECRET, WEBHOOK_SECRET_KEY, OAuth provider IDs/secrets
+#   cart-iq/<env>/llm       AI_PROVIDER, GOOGLE/OPENAI/ANTHROPIC/GROQ/TOGETHER_API_KEY,
+#                            EMBED_GOOGLE_API_KEY, OLLAMA_API_BASE, PARITY_CHAT_MODEL
 #
 # Usage:
 #   cp scripts/seed-secrets.example.env scripts/seed-secrets.env
@@ -145,13 +146,15 @@ backend_json=$(build_json \
   --arg WEBHOOK_SECRET_KEY "$WEBHOOK_SECRET_KEY")
 
 db_json=$(build_json \
-  --arg DB_HOST              "$DB_HOST" \
-  --arg DB_PORT              "$DB_PORT" \
-  --arg DB_USER              "$DB_USER" \
-  --arg DB_PASSWORD          "$DB_PASSWORD" \
-  --arg DB_NAME              "$DB_NAME" \
-  --arg DB_NAME_AUTH         "$DB_NAME_AUTH" \
-  --arg DATABASE_STRING_AUTH "$DATABASE_STRING_AUTH")
+  --arg DB_HOST                "$DB_HOST" \
+  --arg DB_PORT                "$DB_PORT" \
+  --arg DB_USER                "$DB_USER" \
+  --arg DB_PASSWORD            "$DB_PASSWORD" \
+  --arg DB_NAME                "$DB_NAME" \
+  --arg DB_NAME_AUTH           "$DB_NAME_AUTH" \
+  --arg DATABASE_STRING_AUTH   "$DATABASE_STRING_AUTH" \
+  --arg PARITY_CHAT_DB_USER     "${PARITY_CHAT_DB_USER:-$DB_USER}" \
+  --arg PARITY_CHAT_DB_PASSWORD "${PARITY_CHAT_DB_PASSWORD-}")
 
 redis_json=$(build_json \
   --arg CELERY_BROKER_URL "$CELERY_BROKER_URL")
@@ -167,21 +170,20 @@ auth_json=$(build_json \
   --arg MICROSOFT_CLIENT_SECRET "${MICROSOFT_CLIENT_SECRET-}")
 
 llm_json=$(build_json \
-  --arg LLM_PROVIDER         "${LLM_PROVIDER-}" \
-  --arg GEMINI_API_KEY       "${GEMINI_API_KEY-}" \
-  --arg GEMINI_MODEL         "${GEMINI_MODEL-}" \
-  --arg OPENAI_API_KEY       "${OPENAI_API_KEY-}" \
-  --arg OPENAI_MODEL         "${OPENAI_MODEL-}" \
-  --arg ANTHROPIC_API_KEY    "${ANTHROPIC_API_KEY-}" \
-  --arg ANTHROPIC_MODEL      "${ANTHROPIC_MODEL-}" \
+  --arg AI_PROVIDER          "${AI_PROVIDER-}" \
   --arg GOOGLE_API_KEY       "${GOOGLE_API_KEY-}" \
-  --arg LANGFUSE_PUBLIC_KEY  "${LANGFUSE_PUBLIC_KEY-}" \
-  --arg LANGFUSE_SECRET_KEY  "${LANGFUSE_SECRET_KEY-}")
+  --arg EMBED_GOOGLE_API_KEY "${EMBED_GOOGLE_API_KEY-}" \
+  --arg OPENAI_API_KEY       "${OPENAI_API_KEY-}" \
+  --arg ANTHROPIC_API_KEY    "${ANTHROPIC_API_KEY-}" \
+  --arg GROQ_API_KEY         "${GROQ_API_KEY-}" \
+  --arg TOGETHER_API_KEY     "${TOGETHER_API_KEY-}" \
+  --arg OLLAMA_API_BASE      "${OLLAMA_API_BASE-}" \
+  --arg PARITY_CHAT_MODEL    "${PARITY_CHAT_MODEL-}")
 
 # ── Push to Secrets Manager ───────────────────────────────────────────────────
 put() {
   local grp="$1" json="$2"
-  local id="insur-iq/$ENV/$grp"
+  local id="cart-iq/$ENV/$grp"
   local count
   count=$(printf '%s' "$json" | jq 'length')
   aws secretsmanager put-secret-value \

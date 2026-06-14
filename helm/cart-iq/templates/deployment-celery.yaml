@@ -1,0 +1,102 @@
+{{- /* Celery worker deployments — one Deployment per queue class. */ -}}
+{{- range $name, $cfg := .Values.celery }}
+{{- if and (kindIs "map" $cfg) (hasKey $cfg "queues") (ne $name "beat") (or (not (hasKey $cfg "enabled")) $cfg.enabled) }}
+{{- /* Per-queue image selection: "scraper" uses the Playwright image, anything else the backend image. */ -}}
+{{- $imageKind := default "backend" $cfg.image -}}
+{{- $image := include "cart-iq.image.backend" $ -}}
+{{- $pullPolicy := $.Values.image.backend.pullPolicy -}}
+{{- if eq $imageKind "scraper" -}}
+{{- $image = include "cart-iq.image.scraper" $ -}}
+{{- $pullPolicy = $.Values.image.scraper.pullPolicy -}}
+{{- end -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cart-iq.fullname" $ }}-celery-{{ kebabcase $name }}
+  labels:
+    {{- include "cart-iq.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: celery-{{ kebabcase $name }}
+spec:
+  replicas: {{ $cfg.replicas }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "cart-iq.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: celery-{{ kebabcase $name }}
+  template:
+    metadata:
+      labels:
+        {{- include "cart-iq.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: celery-{{ kebabcase $name }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
+        {{- with $.Values.celery.podAnnotations }}{{ toYaml . | nindent 8 }}{{- end }}
+    spec:
+      serviceAccountName: {{ include "cart-iq.sa.celery" $ }}
+      securityContext:
+        {{- include "cart-iq.podSecurityContext" $ | nindent 8 }}
+      {{- with $.Values.global.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $cfg.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: worker
+          image: {{ $image }}
+          imagePullPolicy: {{ $pullPolicy }}
+          command:
+            - celery
+            - -A
+            - config
+            - worker
+            - --loglevel=INFO
+            - --queues={{ $cfg.queues }}
+            - --concurrency={{ $cfg.concurrency }}
+            {{- with $cfg.pool }}
+            - --pool={{ . }}
+            {{- end }}
+            - --hostname={{ kebabcase $name }}@%h
+            {{- range $cfg.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
+          envFrom:
+            {{- include "cart-iq.backendEnvFrom" $ | nindent 12 }}
+          env:
+            {{- include "cart-iq.backendDerivedEnv" $ | nindent 12 }}
+            {{- range $cfg.extraEnv }}
+            - {{ toYaml . | nindent 14 | trim }}
+            {{- end }}
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pgrep -f 'celery.*worker' > /dev/null"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources: {{ toYaml $cfg.resources | nindent 12 }}
+          securityContext:
+            {{- include "cart-iq.containerSecurityContext" $ | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if $cfg.devShm }}
+            # Chromium maps shared memory under /dev/shm; the container default
+            # (64Mi) crashes tabs. A memory-backed emptyDir gives it real space
+            # while keeping readOnlyRootFilesystem intact.
+            - name: dev-shm
+              mountPath: /dev/shm
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ default "2Gi" $cfg.tmpSizeLimit }}
+        {{- if $cfg.devShm }}
+        - name: dev-shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ default "1Gi" $cfg.devShmSizeLimit }}
+        {{- end }}
+{{- end }}
+{{- end }}

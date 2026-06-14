@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "insur-iq.fullname" . }}-auth
+  name: {{ include "cart-iq.fullname" . }}-auth
   labels:
-    {{- include "insur-iq.labels" . | nindent 4 }}
+    {{- include "cart-iq.labels" . | nindent 4 }}
     app.kubernetes.io/component: auth
 spec:
   {{- if not .Values.autoscaling.auth.enabled }}
@@ -17,26 +17,26 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      {{- include "insur-iq.selectorLabels" . | nindent 6 }}
+      {{- include "cart-iq.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: auth
   template:
     metadata:
       labels:
-        {{- include "insur-iq.selectorLabels" . | nindent 8 }}
+        {{- include "cart-iq.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: auth
       annotations:
         {{- toYaml .Values.auth.podAnnotations | nindent 8 }}
     spec:
       securityContext:
-        {{- include "insur-iq.podSecurityContext" . | nindent 8 }}
+        {{- include "cart-iq.podSecurityContext" . | nindent 8 }}
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets: {{ toYaml . | nindent 8 }}
       {{- end }}
       topologySpreadConstraints:
-        {{- include "insur-iq.topologySpread" . | nindent 8 }}
+        {{- include "cart-iq.topologySpread" . | nindent 8 }}
       containers:
         - name: auth
-          image: {{ include "insur-iq.image.auth" . }}
+          image: {{ include "cart-iq.image.auth" . }}
           imagePullPolicy: {{ .Values.image.auth.pullPolicy }}
           args: {{ toJson .Values.auth.command }}
           ports:
@@ -44,13 +44,13 @@ spec:
               containerPort: {{ .Values.auth.appPort }}
               protocol: TCP
           envFrom:
-            {{- include "insur-iq.authEnvFrom" . | nindent 12 }}
+            {{- include "cart-iq.authEnvFrom" . | nindent 12 }}
           env:
-            {{- include "insur-iq.authDerivedEnv" . | nindent 12 }}
+            {{- include "cart-iq.authDerivedEnv" . | nindent 12 }}
             {{- with .Values.auth.extraEnv }}{{ toYaml . | nindent 12 }}{{- end }}
           resources: {{ toYaml .Values.auth.resources | nindent 12 }}
           securityContext:
-            {{- include "insur-iq.containerSecurityContext" . | nindent 12 }}
+            {{- include "cart-iq.containerSecurityContext" . | nindent 12 }}
           volumeMounts:
             - name: tmp
               mountPath: /tmp
@@ -86,7 +86,7 @@ spec:
             sizeLimit: 256Mi
         - name: nginx-conf
           configMap:
-            name: {{ include "insur-iq.fullname" . }}-auth-nginx
+            name: {{ include "cart-iq.fullname" . }}-auth-nginx
         - name: nginx-tmp
           emptyDir:
             sizeLimit: 64Mi

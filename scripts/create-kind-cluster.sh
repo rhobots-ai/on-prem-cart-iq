@@ -3,7 +3,7 @@
 
 set -e
 
-CLUSTER_NAME="insur-iq"
+CLUSTER_NAME="cart-iq"
 K8S_VERSION="1.28"  # Stable version
 
 echo "🔧 Creating kind cluster: $CLUSTER_NAME"
@@ -77,7 +77,7 @@ echo ""
 echo "2. Wait for ingress controller:"
 echo "   kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s"
 echo ""
-echo "3. Deploy insur-iq:"
+echo "3. Deploy cart-iq:"
 echo "   ./scripts/helm-quick-deploy.sh dev"
 echo ""
 echo "Useful commands:"

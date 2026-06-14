@@ -1,0 +1,14 @@
+{{ include "cart-iq.fullname" . }} installed.
+
+App URL:        https://{{ include "cart-iq.domain" . }}
+Backend health: https://{{ include "cart-iq.domain" . }}/service-api/api/health/
+Auth health:    https://{{ include "cart-iq.domain" . }}/auth/api/auth/ok
+
+Verify rollout:
+  kubectl rollout status deploy/{{ include "cart-iq.fullname" . }}-backend -n {{ .Release.Namespace }}
+  kubectl rollout status deploy/{{ include "cart-iq.fullname" . }}-web     -n {{ .Release.Namespace }}
+  kubectl rollout status deploy/{{ include "cart-iq.fullname" . }}-auth    -n {{ .Release.Namespace }}
+
+Rollback (if needed):
+  helm history {{ .Release.Name }} -n {{ .Release.Namespace }}
+  helm rollback {{ .Release.Name }} <REV> -n {{ .Release.Namespace }}

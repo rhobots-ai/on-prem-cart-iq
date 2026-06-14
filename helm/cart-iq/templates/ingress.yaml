@@ -4,9 +4,9 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "insur-iq.fullname" . }}
+  name: {{ include "cart-iq.fullname" . }}
   labels:
-    {{- include "insur-iq.labels" . | nindent 4 }}
+    {{- include "cart-iq.labels" . | nindent 4 }}
   annotations:
     alb.ingress.kubernetes.io/scheme: {{ .Values.ingress.scheme }}
     alb.ingress.kubernetes.io/target-type: {{ .Values.ingress.targetType }}
@@ -16,7 +16,7 @@ metadata:
     alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds={{ .Values.ingress.idleTimeoutSeconds }},routing.http.drop_invalid_header_fields.enabled=true
     alb.ingress.kubernetes.io/healthcheck-path: /
     alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
-    alb.ingress.kubernetes.io/group.name: {{ include "insur-iq.fullname" . }}
+    alb.ingress.kubernetes.io/group.name: {{ include "cart-iq.fullname" . }}
     {{- if .Values.ingress.adminCidrAllowlist }}
     # Admin path lockdown — listener rule restricting /service-api/admin/*.
     alb.ingress.kubernetes.io/conditions.admin: |
@@ -28,7 +28,7 @@ metadata:
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:
-    - host: {{ default (include "insur-iq.domain" .) .Values.ingress.host }}
+    - host: {{ default (include "cart-iq.domain" .) .Values.ingress.host }}
       http:
         paths:
           {{- if .Values.ingress.adminCidrAllowlist }}
@@ -36,7 +36,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "insur-iq.fullname" . }}-backend
+                name: {{ include "cart-iq.fullname" . }}-backend
                 port:
                   number: {{ .Values.backend.containerPort }}
           {{- end }}
@@ -44,21 +44,21 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "insur-iq.fullname" . }}-backend
+                name: {{ include "cart-iq.fullname" . }}-backend
                 port:
                   number: {{ .Values.backend.containerPort }}
           - path: /auth
             pathType: Prefix
             backend:
               service:
-                name: {{ include "insur-iq.fullname" . }}-auth
+                name: {{ include "cart-iq.fullname" . }}-auth
                 port:
                   number: {{ .Values.auth.containerPort }}
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: {{ include "insur-iq.fullname" . }}-web
+                name: {{ include "cart-iq.fullname" . }}-web
                 port:
                   number: {{ .Values.web.containerPort }}
 {{- end }}

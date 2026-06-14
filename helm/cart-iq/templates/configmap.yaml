@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cart-iq.configMapName" . }}
+  labels:
+    {{- include "cart-iq.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+data:
+  DEBUG: {{ .Values.config.DEBUG | quote }}
+  APP_ENV: {{ .Values.config.APP_ENV | quote }}
+  AWS_REGION: {{ default .Values.global.awsRegion .Values.config.AWS_REGION | quote }}
+  AWS_S3_REGION_NAME: {{ default .Values.global.awsRegion .Values.config.AWS_REGION | quote }}
+  AWS_STORAGE_BUCKET_NAME: {{ required "config.AWS_STORAGE_BUCKET_NAME is required" .Values.config.AWS_STORAGE_BUCKET_NAME | quote }}
+  AWS_S3_ENDPOINT_URL: {{ .Values.config.AWS_S3_ENDPOINT_URL | quote }}
+  AWS_S3_PUBLIC_ENDPOINT_URL: {{ .Values.config.AWS_S3_PUBLIC_ENDPOINT_URL | quote }}
+  CELERY_RESULT_BACKEND: {{ .Values.config.CELERY_RESULT_BACKEND | quote }}
+  CELERY_CACHE_BACKEND: {{ .Values.config.CELERY_CACHE_BACKEND | quote }}
+  # Embedding + parity-chat tuning (provider/model/keys live in the llm Secret).
+  EMBED_MODEL: {{ .Values.config.EMBED_MODEL | quote }}
+  EMBED_DIMENSIONS: {{ .Values.config.EMBED_DIMENSIONS | quote }}
+  GEMINI_USE_VERTEX_AI: {{ .Values.config.GEMINI_USE_VERTEX_AI | quote }}
+  EMBED_USE_VERTEX_AI: {{ .Values.config.EMBED_USE_VERTEX_AI | quote }}
+  PARITY_CHAT_CACHE_ENABLED: {{ .Values.config.PARITY_CHAT_CACHE_ENABLED | quote }}
+  ANTHROPIC_RATIONALES_ENABLED: {{ .Values.config.ANTHROPIC_RATIONALES_ENABLED | quote }}
+  # Scraper tunables.
+  SCRAPER_DEFAULT_PINCODE: {{ .Values.config.SCRAPER_DEFAULT_PINCODE | quote }}
+  SCRAPER_MAX_CONCURRENCY: {{ .Values.config.SCRAPER_MAX_CONCURRENCY | quote }}
+  SCRAPER_RATE_LIMIT_ENABLED: {{ .Values.config.SCRAPER_RATE_LIMIT_ENABLED | quote }}
+  SCRAPER_LISTING_PARTITION: {{ .Values.config.SCRAPER_LISTING_PARTITION | quote }}

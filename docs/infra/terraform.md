@@ -1,4 +1,4 @@
-# Terraform skeleton — insur-iq AWS managed infra
+# Terraform skeleton — cart-iq AWS managed infra
 
 This skeleton provisions everything outside the EKS cluster that the Helm chart depends on:
 
@@ -10,7 +10,7 @@ This skeleton provisions everything outside the EKS cluster that the Helm chart 
 | `rds_proxy` | RDS Proxy fronting the instance, IAM role, security group |
 | `elasticache` | Redis 7 single-node cache cluster |
 | `s3` | App uploads bucket, SSE-S3 |
-| `ecr` | Two private repos (backend, web) + pull-through cache for Docker Hub |
+| `ecr` | Three private repos (backend, web, scraper) + pull-through cache for Docker Hub |
 | `secrets_manager` | 5 SM secrets seeded with placeholder values (operator fills via CLI) |
 | `iam_pod_identity` | EKS Pod Identity associations: backend, celery, ESO, EBS CSI, LBC, external-dns |
 | `acm` | Regional cert for `app.<domain>` validated via Route53 DNS |
@@ -60,10 +60,10 @@ After `terraform apply`, copy these outputs into your `values.<env>.yaml`:
 See `variables.tf`. Core inputs:
 
 ```hcl
-variable "name"        { default = "insur-iq" }
+variable "name"        { default = "cart-iq" }
 variable "env"         { default = "prod" }
 variable "region"      { default = "ap-south-1" }
-variable "domain"      {}                            # e.g. "insuriq.acmecorp.com"
+variable "domain"      {}                            # e.g. "cartiq.acmecorp.com"
 variable "route53_zone_id" { default = "" }          # leave blank to create
 variable "vpc_cidr"    { default = "10.20.0.0/16" }
 variable "azs"         { default = ["ap-south-1a", "ap-south-1b", "ap-south-1c"] }
