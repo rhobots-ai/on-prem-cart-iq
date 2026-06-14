@@ -1,4 +1,4 @@
-# insur-iq — AWS Infrastructure Requirements
+# cart-iq — AWS Infrastructure Requirements
 
 ## EKS Cluster (Kubernetes)
 
@@ -6,12 +6,11 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | system | t3.medium | 2 | 4 GB | 1 | 2 | 1 |
 | app | t3.xlarge | 4 | 16 GB | 1 | 3 | 1 |
-| gpu | g5.2xlarge | 8 | 32 GB | 1 | 2 | 1 |
 
 - **system** nodes run Kubernetes infrastructure: CoreDNS, VPC CNI, kube-proxy, ALB Controller, Cluster Autoscaler, External Secrets Operator, CloudWatch Agent
-- **app** nodes run application workloads: backend, web, auth, celery workers
-- **gpu** nodes run GPU-accelerated workloads (1x NVIDIA A10G GPU); Cluster Autoscaler scales up to 2 nodes under load
+- **app** nodes run application workloads: backend, web, auth, celery workers (including the Playwright/Chromium scraper worker — CPU/memory bound, no GPU)
 - Starts at 2 nodes; Cluster Autoscaler scales app nodes up to 3 automatically under load
+- No GPU node group: cart-iq uses API-based embeddings/inference. Add one only if you adopt self-hosted local models (e.g. ollama).
 
 ### Application Pod Scaling
 
@@ -20,14 +19,13 @@
 | backend (Django) | 1 | 4 | CPU > 70% |
 | web (Nuxt SSR) | 1 | 2 | CPU > 70% |
 | auth | 1 | 2 | CPU > 70% |
-| celery-default | 1 | 1 | Fixed |
-| celery-policyExtract | 1 | 1 | Fixed |
-| celery-commissionIntake | 1 | 1 | Fixed |
+| celery-default | 1 | 1 | Fixed (queue: `celery`) |
+| celery-scraper | 1 | 1 | Fixed (Playwright; queues: `scraper_listing,scraper`, prefork pool) |
 | celery-beat | 1 | 1 | Singleton — never scale |
 
 ---
 
-## RDS — PostgreSQL 17
+## RDS — PostgreSQL 16
 
 | Parameter | Value |
 | --- | --- |
@@ -36,7 +34,8 @@
 | Storage | 100 GB (gp3, encrypted) |
 | Multi-AZ | No (single-AZ to start) |
 | Connection pooling | RDS Proxy (included) |
-| Logical databases | `insure_iq` (Django) + `auth` (Better Auth) |
+| Logical databases | `cart_iq` (Django) + `auth` (Better Auth) |
+| Extensions | `pgvector` (enabled on `cart_iq` by the db-init job — embedding columns) |
 | Backups | 7-day retention |
 
 ---
@@ -71,7 +70,7 @@
 | ACM Certificate (1x) | TLS termination for the domain |
 | NAT Gateway (1x) | Outbound internet for private subnets |
 | Secrets Manager (5 secrets) | App credentials and API keys |
-| ECR (2 repositories) | Container image registry (backend + web) |
+| ECR (3 repositories) | Container image registry (backend + web + scraper) |
 | CloudWatch | Centralized logs and metrics |
 
 ---
@@ -82,5 +81,5 @@
 | --- | --- | --- |
 | Production go-live | Enable RDS Multi-AZ | Database HA — standby replica in second AZ |
 | Multi-AZ resilience needed | Switch to 3 NAT Gateways | Per-AZ outbound redundancy |
-| Higher document throughput | Increase `celery-policyExtract` replicas to 2 | Parallel AI processing |
+| Higher scrape throughput | Increase `celery.scraper.replicas` (and `SCRAPER_MAX_CONCURRENCY`) | Parallel browser scraping |
 | Data growth | Increase RDS storage or upgrade to `db.t4g.large` | More RAM = better query performance |

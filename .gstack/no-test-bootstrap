@@ -1,0 +1,2 @@
+Deploy-only repo (Terraform + Helm + bash). No application runtime.
+Verification gate = helm lint/template + terraform fmt/validate + verify-infra.sh + smoke curls.

@@ -1,6 +1,6 @@
-# insur-iq Deployment Docs
+# cart-iq Deployment Docs
 
-Deployment artifacts for running **insur-iq** on a customer-managed AWS account (EKS).
+Deployment artifacts for running **cart-iq** on a customer-managed AWS account (EKS).
 
 This documentation covers everything a DevOps engineer needs to provision infrastructure and deploy the application from scratch.
 
@@ -12,7 +12,7 @@ This documentation covers everything a DevOps engineer needs to provision infras
 
 ## Architecture
 
-Single ALB, path-based routing into one namespace (`insur-iq`):
+Single ALB, path-based routing into one namespace (`cart-iq`):
 
 | Path | Service | Port |
 | ---- | ------- | ---- |
@@ -20,6 +20,6 @@ Single ALB, path-based routing into one namespace (`insur-iq`):
 | `/service-api/` | backend (Django + gunicorn) | 8000 |
 | `/auth/` | auth (Better Auth) | 10000 |
 
-Celery workers (`default`, `policy_extract`, `commission_intake`, `beat`) consume a Redis broker and write to Django ORM.
+Celery workers (`default`, `scraper`, `beat`) consume a Redis broker and write to Django ORM.
 
 **Data plane:** RDS Postgres 16 (via RDS Proxy) · ElastiCache Redis 7 · S3

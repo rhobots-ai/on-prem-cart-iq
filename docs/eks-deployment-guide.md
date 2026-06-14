@@ -1,6 +1,6 @@
-# insur-iq — AWS EKS Deployment Guide
+# cart-iq — AWS EKS Deployment Guide
 
-This guide is **self-contained**: a DevOps engineer who has never seen the project should be able to deploy insur-iq on a fresh AWS account by following this document end-to-end.
+This guide is **self-contained**: a DevOps engineer who has never seen the project should be able to deploy cart-iq on a fresh AWS account by following this document end-to-end.
 
 The deployment is **configuration-driven**. You will edit one Helm values file (15–20 lines) and run a small set of commands.
 
@@ -42,11 +42,11 @@ source ./deploy.env
 # 1. Generate my-values.yaml from Terraform outputs.
 #    Run from the repo root — the redirect path is relative to your CWD.
 #    (See §4 for what this file contains and §7 for what to edit in it.)
-cd /path/to/on-prem-insur-iq    # repo root
+cd /path/to/on-prem-cart-iq    # repo root
 terraform -chdir=infra/terraform output -raw helm_values_snippet \
-  > helm/insur-iq/my-values.yaml
+  > helm/cart-iq/my-values.yaml
 
-# 2. Edit helm/insur-iq/my-values.yaml to add image tags from CI.
+# 2. Edit helm/cart-iq/my-values.yaml to add image tags from CI.
 #    The file is gitignored — never commit it.
 
 # 3. Seed Secrets Manager (one-time per env). See §6 for the env file layout.
@@ -60,9 +60,9 @@ kubectl create namespace $NAMESPACE \
   | kubectl label --local -f - pod-security.kubernetes.io/enforce=restricted -o yaml \
   | kubectl apply -f -
 
-helm install insur-iq ./helm/insur-iq \
+helm install cart-iq ./helm/cart-iq \
   --namespace $NAMESPACE \
-  --values helm/insur-iq/my-values.yaml \
+  --values helm/cart-iq/my-values.yaml \
   --rollback-on-failure --timeout 10m
 
 # 5. Smoke test
@@ -83,7 +83,7 @@ If all three return 2xx, the deploy is live.
                     ▼
          ┌──────────────────────┐
          │   Route 53 ALIAS      │
-         │ insuriq.acmecorp.com │
+         │ cartiq.acmecorp.com │
          └──────────┬───────────┘
                     ▼
          ┌──────────────────────┐
@@ -114,12 +114,12 @@ If all three return 2xx, the deploy is live.
    │ Redis 7        │  │     │        │  │ uploads    │
    │ (broker)       │  │     ▼        │  └────────────┘
    └────────────────┘  │ RDS Postgres │
-                       │  insure_iq   │
+                       │  cart_iq   │
                        │  auth        │
                        └──────────────┘
 ```
 
-External egress: LLM provider APIs (Gemini/OpenAI/Anthropic), Langfuse, ECR, Secrets Manager — all over `0.0.0.0/0:443`.
+External egress: AI provider APIs (Google/OpenAI/Anthropic/Groq/Together), scraper targets (Flipkart etc.), ECR, Secrets Manager — all over `0.0.0.0/0:443`.
 
 ---
 
@@ -161,17 +161,17 @@ Provision the items below **before** running `helm install`. Each item is indepe
 | 3 | EKS 1.35 cluster, OIDC provider, access entries (no aws-auth), managed node groups (system: 1× t3.medium, app: 1× t3.large — both auto-scalable up to 2/3 nodes) | `aws eks describe-cluster` shows status `ACTIVE`; `aws eks describe-nodegroup` shows both groups `ACTIVE` |
 | 4 | Add-ons: VPC CNI (prefix delegation ON), CoreDNS, kube-proxy, EBS CSI, Pod Identity Agent | `aws eks describe-addon ... --query addon.status` returns `ACTIVE` for each |
 | 5 | Cluster controllers: AWS Load Balancer Controller, External Secrets Operator, metrics-server (CloudWatch observability is installed by the EKS addon in Terraform) | each Deployment has Ready replicas |
-| 6 | RDS Postgres 16 (`db.t4g.medium`, single-AZ, 100GB gp3, `force_ssl=1`) with two DBs: `insure_iq`, `auth` | `psql` connects from a bastion / cloudshell |
+| 6 | RDS Postgres 16 (`db.t4g.medium`, single-AZ, 100GB gp3, `force_ssl=1`) with two DBs: `cart_iq`, `auth`; `pgvector` enabled on `cart_iq` (by the db-init job) | `psql` connects from a bastion / cloudshell |
 | 7 | RDS Proxy fronting the instance, security group allows :5432 from EKS pod subnets | `aws rds describe-db-proxies` shows `available` |
 | 8 | ElastiCache Redis 7 (`cache.t4g.small`), security group allows :6379 from EKS pod subnets | `redis-cli -h <endpoint> ping` returns `PONG` |
 | 9 | S3 bucket (SSE-S3) | `aws s3api head-bucket` succeeds |
 | 10 | ACM regional cert for `<domain>` (validated via Route53 DNS) — or set `ACM_CERTIFICATE_ARN` to reuse an existing one (see [§4a](#4a-create-dns-records-manual)) | `aws acm describe-certificate` shows `ISSUED` |
 | 11 | Route53 hosted zone for `<domain>` | `aws route53 list-hosted-zones-by-name` shows the zone |
-| 12 | ECR repos: `insur-iq/backend`, `insur-iq/web`; pull-through cache for Docker Hub (Better Auth) | `aws ecr describe-repositories` lists both |
-| 13 | EKS Pod Identity associations: `insur-iq-backend` (S3 RW + SM read), `insur-iq-celery` (S3 RW + SM read) in namespace `insur-iq` | `aws eks list-pod-identity-associations` shows both |
-| 14 | Secrets Manager entries: 5 secrets under `insur-iq/<env>/{backend,db,redis,auth,llm}` populated (see [§6](#6-secrets-manager-seeding) — `./scripts/seed-secrets.sh` does this in one pass) | `aws secretsmanager get-secret-value` returns each |
+| 12 | ECR repos: `cart-iq/backend`, `cart-iq/web`, `cart-iq/scraper`; pull-through cache for Docker Hub (Better Auth) | `aws ecr describe-repositories` lists all three |
+| 13 | EKS Pod Identity associations: `cart-iq-backend` (S3 RW + SM read), `cart-iq-celery` (S3 RW + SM read) in namespace `cart-iq` | `aws eks list-pod-identity-associations` shows both |
+| 14 | Secrets Manager entries: 5 secrets under `cart-iq/<env>/{backend,db,redis,auth,llm}` populated (see [§6](#6-secrets-manager-seeding) — `./scripts/seed-secrets.sh` does this in one pass) | `aws secretsmanager get-secret-value` returns each |
 | 15 | A `ClusterSecretStore` named `aws-secretsmanager` in the cluster, scoped to the SM secrets above | `kubectl get clustersecretstore aws-secretsmanager` |
-| 16 | Namespace `insur-iq` with `pod-security.kubernetes.io/enforce=restricted` label | `kubectl get ns insur-iq -o jsonpath='{.metadata.labels}'` shows the label |
+| 16 | Namespace `cart-iq` with `pod-security.kubernetes.io/enforce=restricted` label | `kubectl get ns cart-iq -o jsonpath='{.metadata.labels}'` shows the label |
 
 Once Terraform has applied and items 1–15 should exist, run [`./scripts/verify-infra.sh`](./scripts/verify-infra.sh) to confirm they're all healthy. (See [§8](#8-first-install) for the invocation with all required env vars.)
 
@@ -198,19 +198,19 @@ After apply:
 
 ```bash
 # Configure kubectl
-aws eks update-kubeconfig --name insur-iq-prod --region ap-south-1
+aws eks update-kubeconfig --name cart-iq-prod --region ap-south-1
 
 # Generate the env-specific Helm values file, named my-values.yaml,
 # from Terraform outputs. This file holds your account ID, ACM cert ARN,
 # S3 bucket name, ECR repos, subnet CIDRs, and Pod Identity role ARNs.
-# Run from the repo root — the redirect path (helm/insur-iq/...) is
+# Run from the repo root — the redirect path (helm/cart-iq/...) is
 # relative to your shell's CWD, not to the -chdir flag.
 cd ../..   # back to repo root from infra/terraform
 terraform -chdir=infra/terraform output -raw helm_values_snippet \
-  > helm/insur-iq/my-values.yaml
+  > helm/cart-iq/my-values.yaml
 ```
 
-The file `helm/insur-iq/my-values.yaml` is now created and **gitignored** — never commit it. You will edit it in [§7](#7-helm-values-walkthrough) to add the bits Terraform doesn't know (image tags from CI, OAuth client IDs, etc.).
+The file `helm/cart-iq/my-values.yaml` is now created and **gitignored** — never commit it. You will edit it in [§7](#7-helm-values-walkthrough) to add the bits Terraform doesn't know (image tags from CI, OAuth client IDs, etc.).
 
 While you're here, also save the controller install commands for [§5](#5-cluster-bootstrap):
 
@@ -326,7 +326,7 @@ If you'd rather run them by hand (substituting your cluster name/region/VPC):
 helm repo add eks https://aws.github.io/eks-charts && helm repo update
 helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
   -n kube-system \
-  --set clusterName=insur-iq-prod \
+  --set clusterName=cart-iq-prod \
   --set region=ap-south-1 \
   --set vpcId=<your-vpc-id> \
   --set serviceAccount.create=true \
@@ -358,7 +358,7 @@ helm upgrade --install metrics-server metrics-server/metrics-server -n kube-syst
 helm repo add autoscaler https://kubernetes.github.io/autoscaler && helm repo update
 helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \
   -n kube-system \
-  --set autoDiscovery.clusterName=insur-iq-prod \
+  --set autoDiscovery.clusterName=cart-iq-prod \
   --set awsRegion=ap-south-1 \
   --set rbac.serviceAccount.create=true \
   --set rbac.serviceAccount.name=cluster-autoscaler \
@@ -386,9 +386,9 @@ kubectl -n kube-system logs deploy/cluster-autoscaler-aws-cluster-autoscaler --t
 ```
 
 > **How autoscaling fits together** (top-down):
-> 1. **HPA** watches pod CPU% via metrics-server. When `backend` averages >70% CPU, it bumps replicas (up to `maxReplicas` in [values.yaml](../../helm/insur-iq/values.yaml)).
+> 1. **HPA** watches pod CPU% via metrics-server. When `backend` averages >70% CPU, it bumps replicas (up to `maxReplicas` in [values.yaml](../../helm/cart-iq/values.yaml)).
 > 2. New replica is `Pending` if no node has room.
-> 3. **Cluster Autoscaler** sees the Pending pod, finds an ASG tagged `k8s.io/cluster-autoscaler/insur-iq-prod=owned` whose template fits the pod, and calls `SetDesiredCapacity`.
+> 3. **Cluster Autoscaler** sees the Pending pod, finds an ASG tagged `k8s.io/cluster-autoscaler/cart-iq-prod=owned` whose template fits the pod, and calls `SetDesiredCapacity`.
 > 4. AWS provisions a new EC2; once it joins the cluster (~2-3 min), the pod schedules.
 > 5. When load drops, HPA shrinks replicas, CA notices the under-utilization (>10 min), drains and terminates the node.
 
@@ -401,7 +401,7 @@ cat <<'EOF' | kubectl apply -f -
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: insur-iq
+  name: cart-iq
   labels:
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/enforce-version: latest
@@ -447,7 +447,7 @@ aws eks create-pod-identity-association \
   --role-arn "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${CLUSTER_NAME}-external-secrets"
 ```
 
-The role must have `secretsmanager:GetSecretValue` on `arn:aws:secretsmanager:*:*:secret:insur-iq/*`.
+The role must have `secretsmanager:GetSecretValue` on `arn:aws:secretsmanager:*:*:secret:cart-iq/*`.
 
 ---
 
@@ -459,11 +459,11 @@ Each secret is a **JSON-shaped** value. ESO extracts every JSON key into a Kuber
 
 | Secrets Manager path | Keys | Consumed by |
 |---|---|---|
-| `insur-iq/<env>/backend` | `SECRET_KEY`, `WEBHOOK_SECRET_KEY` | backend, celery, beat, migrate |
-| `insur-iq/<env>/db` | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_NAME_AUTH`, `DATABASE_STRING_AUTH` | backend, celery, beat, migrate, auth, auth-db-init |
-| `insur-iq/<env>/redis` | `CELERY_BROKER_URL` | backend, celery, beat |
-| `insur-iq/<env>/auth` | `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | auth |
-| `insur-iq/<env>/llm` | `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | backend, celery |
+| `cart-iq/<env>/backend` | `SECRET_KEY`, `WEBHOOK_SECRET_KEY` | backend, celery, beat, migrate |
+| `cart-iq/<env>/db` | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_NAME_AUTH`, `DATABASE_STRING_AUTH`, `PARITY_CHAT_DB_USER`, `PARITY_CHAT_DB_PASSWORD` | backend, celery, beat, migrate, auth, db-init |
+| `cart-iq/<env>/redis` | `CELERY_BROKER_URL` | backend, celery, beat |
+| `cart-iq/<env>/auth` | `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | auth |
+| `cart-iq/<env>/llm` | `AI_PROVIDER`, `GOOGLE_API_KEY`, `EMBED_GOOGLE_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `TOGETHER_API_KEY`, `OLLAMA_API_BASE`, `PARITY_CHAT_MODEL` | backend, celery |
 
 ### Seeding commands
 
@@ -481,41 +481,41 @@ ENV=prod ./scripts/seed-secrets.sh
 # 3. Confirm all 5 SM entries exist (focused check; the full sweep is in §8).
 for grp in backend db redis auth llm; do
   aws secretsmanager describe-secret \
-    --secret-id "insur-iq/prod/$grp" --region ap-south-1 \
+    --secret-id "cart-iq/prod/$grp" --region ap-south-1 \
     --query Name --output text
 done
 
 # 4. Force ESO to re-sync now (otherwise it waits for refreshInterval, default 1h).
-kubectl -n insur-iq annotate externalsecret --all force-sync=$(date +%s) --overwrite
-kubectl -n insur-iq get externalsecret    # every row should show STATUS=SecretSynced
+kubectl -n cart-iq annotate externalsecret --all force-sync=$(date +%s) --overwrite
+kubectl -n cart-iq get externalsecret    # every row should show STATUS=SecretSynced
 ```
 
-The flat `seed-secrets.env` shape mirrors the application's `.env.example` (in the main `insur-iq` repo); the script reshapes it into the five JSON entries that [`helm/insur-iq/templates/_helpers.tpl`](../../helm/insur-iq/templates/_helpers.tpl) (`backendEnvFrom`) wires into pods via `envFrom: secretRef`. Re-running is safe: generated random values are persisted back to `seed-secrets.env`, so subsequent runs produce byte-identical SM payloads (no version churn, no session invalidation). Keep `seed-secrets.env` in 1Password / your password manager — it's the only artifact you need to round-trip through this script.
+The flat `seed-secrets.env` shape mirrors the application's `.env.example` (in the main `cart-iq` repo); the script reshapes it into the five JSON entries that [`helm/cart-iq/templates/_helpers.tpl`](../../helm/cart-iq/templates/_helpers.tpl) (`backendEnvFrom`) wires into pods via `envFrom: secretRef`. Re-running is safe: generated random values are persisted back to `seed-secrets.env`, so subsequent runs produce byte-identical SM payloads (no version churn, no session invalidation). Keep `seed-secrets.env` in 1Password / your password manager — it's the only artifact you need to round-trip through this script.
 
 ### Rotation
 
 | Secret | Strategy | Side effect of rotation |
 |---|---|---|
-| `db.DB_PASSWORD` | SM scheduled rotation (Lambda), 30-day cadence; ESO refreshes K8s Secret; restart with `kubectl rollout restart deploy -n insur-iq -l app.kubernetes.io/component in (backend,celery-default,celery-policy-extract,celery-commission-intake,celery-beat,auth)` | Rolling restart, no downtime |
+| `db.DB_PASSWORD` | SM scheduled rotation (Lambda), 30-day cadence; ESO refreshes K8s Secret; restart with `kubectl rollout restart deploy -n cart-iq -l app.kubernetes.io/component in (backend,celery-default,celery-scraper,celery-beat,auth)` | Rolling restart, no downtime |
 | `backend.SECRET_KEY` | Manual, incident-only | Invalidates Django sessions and signed tokens — schedule maintenance window |
 | `auth.BETTER_AUTH_SECRET` | Manual, incident-only | Logs every user out — schedule maintenance window |
-| LLM keys | Per provider | Rolling restart of backend + celery |
+| AI provider keys | Per provider | Rolling restart of backend + celery |
 
 ---
 
 ## 7. Helm Values Walkthrough
 
-The chart lives at [`helm/insur-iq/`](../../helm/insur-iq/). Two values files stack on `helm install -f`:
+The chart lives at [`helm/cart-iq/`](../../helm/cart-iq/). Two values files stack on `helm install -f`:
 
 | File | Purpose | Edited by |
 |---|---|---|
-| `helm/insur-iq/values.yaml` | Chart defaults — production-ready (autoscaling on, ESO enabled, no in-cluster infra) | Chart maintainer — don't edit per env |
-| `helm/insur-iq/my-values.yaml` | **Your environment** (account ID, ACM ARN, S3 bucket, image tags) | **You — generated in [§4](#4-provisioning-aws-infra-terraform), edited here** |
+| `helm/cart-iq/values.yaml` | Chart defaults — production-ready (autoscaling on, ESO enabled, no in-cluster infra) | Chart maintainer — don't edit per env |
+| `helm/cart-iq/my-values.yaml` | **Your environment** (account ID, ACM ARN, S3 bucket, image tags) | **You — generated in [§4](#4-provisioning-aws-infra-terraform), edited here** |
 
-[`my-values.yaml.example`](../../helm/insur-iq/my-values.yaml.example) shows the minimal shape. Later files override earlier ones, so the install command is:
+[`my-values.yaml.example`](../../helm/cart-iq/my-values.yaml.example) shows the minimal shape. Later files override earlier ones, so the install command is:
 
 ```bash
-helm install insur-iq ./helm/insur-iq -n insur-iq --values helm/insur-iq/my-values.yaml --rollback-on-failure --timeout 10m
+helm install cart-iq ./helm/cart-iq -n cart-iq --values helm/cart-iq/my-values.yaml --rollback-on-failure --timeout 10m
 ```
 
 ### What `my-values.yaml` contains after [§4](#4-provisioning-aws-infra-terraform)
@@ -526,10 +526,10 @@ Most of the file was auto-generated by `terraform output -raw helm_values_snippe
 global:
   awsAccountId: "123456789012"        # filled by Terraform
   awsRegion: ap-south-1
-  domain: insuriq.acmecorp.com
+  domain: cartiq.acmecorp.com
 
 config:
-  AWS_STORAGE_BUCKET_NAME: insur-iq-prod-uploads   # filled by Terraform
+  AWS_STORAGE_BUCKET_NAME: cart-iq-prod-uploads   # filled by Terraform
 
 ingress:
   certificateArn: arn:aws:acm:ap-south-1:.../...   # filled by Terraform
@@ -540,8 +540,9 @@ networkPolicy:
     redisCidrs: ["10.20.32.0/20", "10.20.48.0/20", "10.20.64.0/20"]
 
 image:
-  backend: { repository: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/insur-iq/backend }
-  web:     { repository: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/insur-iq/web }
+  backend: { repository: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/cart-iq/backend }
+  web:     { repository: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/cart-iq/web }
+  scraper: { repository: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/cart-iq/scraper }
 ```
 
 ### What you must add manually
@@ -555,15 +556,21 @@ image:
     tag: "git-abc1234"
   web:
     tag: "git-abc1234"
-
-# Optional: outbound mail sender
-config:
-  AWS_SENDER_EMAIL: no-reply@acmecorp.com
+  scraper:
+    tag: "git-abc1234"
 
 # Optional: lock down /service-api/admin/* to your office VPN range
 ingress:
   adminCidrAllowlist: ["10.0.0.0/8"]
 ```
+
+> **App prerequisite — AWS credentials.** cart-iq's `config/settings.py` currently
+> declares `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` as **required** env vars.
+> This stack uses EKS Pod Identity (no static keys), so the chart deliberately
+> does not set them — setting them (even blank) would short-circuit boto3's
+> credential chain and break Pod Identity. The app must default these blank in
+> `settings.py` (`env("AWS_ACCESS_KEY_ID", default="")`) or backend/celery will
+> fail to boot. See [Appendix D](#appendix-d--decision-log).
 
 ### Auto-derived from `global.domain` (don't set unless overriding)
 
@@ -573,12 +580,12 @@ ingress:
 
 ### How app pods get AWS credentials (Pod Identity)
 
-The chart creates two Kubernetes ServiceAccounts in the `insur-iq` namespace:
+The chart creates two Kubernetes ServiceAccounts in the `cart-iq` namespace:
 
 | ServiceAccount | Used by | IAM role bound (via Terraform) | Permissions |
 |---|---|---|---|
-| `insur-iq-backend` | backend Deployment | `insur-iq-prod-backend` | S3 read/write on uploads bucket |
-| `insur-iq-celery` | all 4 celery Deployments (default, beat, policy-extract, commission-intake) | `insur-iq-prod-celery` | S3 read/write on uploads bucket |
+| `cart-iq-backend` | backend Deployment | `cart-iq-prod-backend` | S3 read/write on uploads bucket |
+| `cart-iq-celery` | all celery Deployments (default, scraper, beat) + migrate / db-init jobs | `cart-iq-prod-celery` | S3 read/write on uploads bucket |
 
 The `aws_eks_pod_identity_association` resources in Terraform ([§4](#4-provisioning-aws-infra-terraform)) bind each ServiceAccount to its IAM role. When a pod runs as one of these SAs, the EKS Pod Identity Agent (a DaemonSet on every node) intercepts AWS SDK credential requests and returns short-lived credentials for the bound role.
 
@@ -586,12 +593,12 @@ The `aws_eks_pod_identity_association` resources in Terraform ([§4](#4-provisio
 
 ```bash
 # Confirm the pod is using the right SA
-kubectl -n insur-iq get pod -l app.kubernetes.io/component=backend -o jsonpath='{.items[0].spec.serviceAccountName}'
-# → should print: insur-iq-backend
+kubectl -n cart-iq get pod -l app.kubernetes.io/component=backend -o jsonpath='{.items[0].spec.serviceAccountName}'
+# → should print: cart-iq-backend
 
 # Confirm the IAM role assumes correctly from inside the pod
-kubectl -n insur-iq exec deploy/insur-iq-insur-iq-backend -- python -c "import boto3; print(boto3.client('sts').get_caller_identity())"
-# → Arn should contain "assumed-role/insur-iq-prod-backend/..."
+kubectl -n cart-iq exec deploy/cart-iq-cart-iq-backend -- python -c "import boto3; print(boto3.client('sts').get_caller_identity())"
+# → Arn should contain "assumed-role/cart-iq-prod-backend/..."
 #   (NOT the node role — that means Pod Identity isn't working)
 ```
 
@@ -602,7 +609,7 @@ To grant a pod additional AWS permissions: add the action to the role's policy i
 | Key | Default | When to change |
 |---|---|---|
 | `backend.replicas` / `autoscaling.backend.maxReplicas` | 2 / 10 | Bump max if HPA sits at max for >15 min |
-| `celery.policyExtract.replicas` | 4 | Bump if `policy_extract` queue lag grows; no autoscaling on celery |
+| `celery.scraper.replicas` / `config.SCRAPER_MAX_CONCURRENCY` | 1 / 3 | Bump if `scraper`/`scraper_listing` queue lag grows; no autoscaling on celery |
 | `ingress.idleTimeoutSeconds` | 300 | Lower to default 60s only if no large uploads |
 | `ingress.adminCidrAllowlist` | `[]` | **Set this** before exposing /service-api/admin/* |
 | `podDisruptionBudget.*.minAvailable` | 1 | Set to `0` if you want fastest cluster upgrades |
@@ -620,9 +627,9 @@ source ./deploy.env
 ./scripts/verify-infra.sh
 
 # Install
-helm install insur-iq ./helm/insur-iq \
-  --namespace insur-iq \
-  --values helm/insur-iq/my-values.yaml \
+helm install cart-iq ./helm/cart-iq \
+  --namespace cart-iq \
+  --values helm/cart-iq/my-values.yaml \
   --rollback-on-failure --timeout 10m
 ```
 
@@ -637,17 +644,17 @@ What `helm install --rollback-on-failure` does:
 Watch progress in another terminal:
 
 ```bash
-kubectl -n insur-iq get pods -w
-kubectl -n insur-iq get jobs
+kubectl -n cart-iq get pods -w
+kubectl -n cart-iq get jobs
 ```
 
 The ALB takes 60–90s to provision after the Ingress is admitted. Get its DNS name:
 
 ```bash
-kubectl -n insur-iq get ingress insur-iq-insur-iq -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+kubectl -n cart-iq get ingress cart-iq-cart-iq -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
-Create a Route53 ALIAS A-record pointing `insuriq.acmecorp.com` at that ALB. (If you installed `external-dns`, this happens automatically.)
+Create a Route53 ALIAS A-record pointing `cartiq.acmecorp.com` at that ALB. (If you installed `external-dns`, this happens automatically.)
 
 ---
 
@@ -656,31 +663,31 @@ Create a Route53 ALIAS A-record pointing `insuriq.acmecorp.com` at that ALB. (If
 ### Smoke tests
 
 ```bash
-curl -fsS https://{insuriq.acmecorp.com}/service-api/api/health/   # → {"status":"ok"}
-curl -fsS https://insuriq.acmecorp.com/auth/api/auth/ok          # → {"ok":true}
-curl -fsS https://insuriq.acmecorp.com/ -o /dev/null -w '%{http_code}\n'  # → 200
+curl -fsS https://{cartiq.acmecorp.com}/service-api/api/health/   # → {"status":"ok"}
+curl -fsS https://cartiq.acmecorp.com/auth/api/auth/ok          # → {"ok":true}
+curl -fsS https://cartiq.acmecorp.com/ -o /dev/null -w '%{http_code}\n'  # → 200
 ```
 
 ### Verification matrix
 
 | Check | Command | Expected |
 |---|---|---|
-| All Deployments Ready | `kubectl -n insur-iq get deploy` | `READY` column matches `UP-TO-DATE` |
-| Backend probe path correct | `kubectl -n insur-iq describe deploy insur-iq-backend \| grep -A1 Liveness` | `httpGet /api/health/` |
-| ALB readiness gates work | `kubectl -n insur-iq get pods -o wide` during a rollout | new pods show `1/1` only after ALB target health passes |
-| ESO reconciled secrets | `kubectl -n insur-iq get externalsecret` | every row `SyncedToTarget=True` |
-| Pod Identity working (backend) | `kubectl -n insur-iq exec deploy/insur-iq-backend -- aws sts get-caller-identity` | `Arn` contains `assumed-role/insur-iq-prod-backend/...`, NOT the node role |
-| Pod Identity working (celery) | `kubectl -n insur-iq exec deploy/insur-iq-celery-default -- aws sts get-caller-identity` | `Arn` contains `assumed-role/insur-iq-prod-celery/...` |
-| HPA reading metrics | `kubectl -n insur-iq get hpa` | `TARGETS` shows real CPU% (not `<unknown>`) for backend, web, and celery workers |
-| Beat is singleton | `kubectl -n insur-iq get pods -l app.kubernetes.io/component=celery-beat` | exactly 1 pod |
-| NetworkPolicies applied | `kubectl -n insur-iq get networkpolicy` | 3 policies (default-deny, allow-ingress-app, allow-egress) |
+| All Deployments Ready | `kubectl -n cart-iq get deploy` | `READY` column matches `UP-TO-DATE` |
+| Backend probe path correct | `kubectl -n cart-iq describe deploy cart-iq-backend \| grep -A1 Liveness` | `httpGet /api/health/` |
+| ALB readiness gates work | `kubectl -n cart-iq get pods -o wide` during a rollout | new pods show `1/1` only after ALB target health passes |
+| ESO reconciled secrets | `kubectl -n cart-iq get externalsecret` | every row `SyncedToTarget=True` |
+| Pod Identity working (backend) | `kubectl -n cart-iq exec deploy/cart-iq-backend -- aws sts get-caller-identity` | `Arn` contains `assumed-role/cart-iq-prod-backend/...`, NOT the node role |
+| Pod Identity working (celery) | `kubectl -n cart-iq exec deploy/cart-iq-celery-default -- aws sts get-caller-identity` | `Arn` contains `assumed-role/cart-iq-prod-celery/...` |
+| HPA reading metrics | `kubectl -n cart-iq get hpa` | `TARGETS` shows real CPU% (not `<unknown>`) for backend, web, and celery workers |
+| Beat is singleton | `kubectl -n cart-iq get pods -l app.kubernetes.io/component=celery-beat` | exactly 1 pod |
+| NetworkPolicies applied | `kubectl -n cart-iq get networkpolicy` | 3 policies (default-deny, allow-ingress-app, allow-egress) |
 | ALB cert is ACM cert | `aws elbv2 describe-listeners ... --query 'Listeners[?Port==\`443\`].Certificates'` | matches your ACM ARN |
 
 ### CloudWatch Container Insights
 
-Open the AWS console → **CloudWatch → Container Insights → Performance monitoring**, scope to cluster `insur-iq-prod`, namespace `insur-iq`. You get per-pod CPU/memory/network/restarts out of the box. Logs land in `/aws/containerinsights/insur-iq-prod/application` and are searchable via Logs Insights.
+Open the AWS console → **CloudWatch → Container Insights → Performance monitoring**, scope to cluster `cart-iq-prod`, namespace `cart-iq`. You get per-pod CPU/memory/network/restarts out of the box. Logs land in `/aws/containerinsights/cart-iq-prod/application` and are searchable via Logs Insights.
 
-For a custom dashboard, the bare-minimum widgets to pin are: ALB request count + 5xx rate, RDS CPU + connections + free storage, ElastiCache CPU + evictions, and per-pod memory for `insur-iq` namespace.
+For a custom dashboard, the bare-minimum widgets to pin are: ALB request count + 5xx rate, RDS CPU + connections + free storage, ElastiCache CPU + evictions, and per-pod memory for `cart-iq` namespace.
 
 ---
 
@@ -694,20 +701,20 @@ For a custom dashboard, the bare-minimum widgets to pin are: ALB request count +
 
 # 2. Take a pre-upgrade RDS snapshot.
 aws rds create-db-snapshot \
-  --db-instance-identifier insur-iq-prod \
-  --db-snapshot-identifier insur-iq-pre-$(date +%Y%m%d-%H%M%S)
+  --db-instance-identifier cart-iq-prod \
+  --db-snapshot-identifier cart-iq-pre-$(date +%Y%m%d-%H%M%S)
 
-# 3. Bump image tags in helm/insur-iq/my-values.yaml and apply.
-helm upgrade insur-iq ./helm/insur-iq \
-  --namespace insur-iq \
-  --values helm/insur-iq/my-values.yaml \
+# 3. Bump image tags in helm/cart-iq/my-values.yaml and apply.
+helm upgrade cart-iq ./helm/cart-iq \
+  --namespace cart-iq \
+  --values helm/cart-iq/my-values.yaml \
   --atomic --timeout 10m
 
 # 4. Verify rollout.
-kubectl -n insur-iq rollout status deploy/insur-iq-backend
-kubectl -n insur-iq rollout status deploy/insur-iq-web
-kubectl -n insur-iq rollout status deploy/insur-iq-auth
-curl -fsS https://insuriq.acmecorp.com/service-api/api/health/
+kubectl -n cart-iq rollout status deploy/cart-iq-backend
+kubectl -n cart-iq rollout status deploy/cart-iq-web
+kubectl -n cart-iq rollout status deploy/cart-iq-auth
+curl -fsS https://cartiq.acmecorp.com/service-api/api/health/
 ```
 
 `--atomic` rolls back the entire release (including hook Jobs) if any step fails or any Deployment fails to become Ready within `--timeout`.
@@ -715,12 +722,12 @@ curl -fsS https://insuriq.acmecorp.com/service-api/api/health/
 ### Rollback runbook (5 commands)
 
 ```bash
-helm history insur-iq -n insur-iq                                  # list revisions
-helm rollback insur-iq <REV> -n insur-iq --wait --timeout 10m      # revert
-kubectl -n insur-iq rollout status deploy/insur-iq-backend
-kubectl -n insur-iq logs -l app.kubernetes.io/component=backend --tail=50
+helm history cart-iq -n cart-iq                                  # list revisions
+helm rollback cart-iq <REV> -n cart-iq --wait --timeout 10m      # revert
+kubectl -n cart-iq rollout status deploy/cart-iq-backend
+kubectl -n cart-iq logs -l app.kubernetes.io/component=backend --tail=50
 # DB-level rollback only if migration corrupted data:
-aws rds restore-db-instance-to-point-in-time --source-db-instance-identifier insur-iq-prod --target-db-instance-identifier insur-iq-prod-restore --restore-time '2026-05-01T12:00:00Z'
+aws rds restore-db-instance-to-point-in-time --source-db-instance-identifier cart-iq-prod --target-db-instance-identifier cart-iq-prod-restore --restore-time '2026-05-01T12:00:00Z'
 ```
 
 ### Migrations
@@ -736,8 +743,8 @@ aws rds restore-db-instance-to-point-in-time --source-db-instance-identifier ins
 ### Partial teardown (app only — keep cluster + infra)
 
 ```bash
-helm uninstall insur-iq -n insur-iq
-kubectl delete namespace insur-iq
+helm uninstall cart-iq -n cart-iq
+kubectl delete namespace cart-iq
 ```
 
 ALB is reaped automatically by the AWS Load Balancer Controller. Everything else (RDS, Redis, S3, ECR, SM) persists. A re-install via `helm install` restores the app in <10 minutes with no data loss.
@@ -747,14 +754,14 @@ ALB is reaped automatically by the AWS Load Balancer Controller. Everything else
 ```bash
 # 1. Final backups (do this before destroying state).
 aws rds create-db-snapshot \
-  --db-instance-identifier insur-iq-prod \
-  --db-snapshot-identifier insur-iq-final-$(date +%Y%m%d)
-aws s3 sync s3://acmecorp-insur-iq-uploads s3://acmecorp-insur-iq-archive
+  --db-instance-identifier cart-iq-prod \
+  --db-snapshot-identifier cart-iq-final-$(date +%Y%m%d)
+aws s3 sync s3://acmecorp-cart-iq-uploads s3://acmecorp-cart-iq-archive
 
 # 2. Drain the app.
-kubectl scale deploy --all -n insur-iq --replicas=0
-helm uninstall insur-iq -n insur-iq
-kubectl delete namespace insur-iq
+kubectl scale deploy --all -n cart-iq --replicas=0
+helm uninstall cart-iq -n cart-iq
+kubectl delete namespace cart-iq
 
 # 3. Remove cluster controllers.
 helm uninstall external-secrets -n external-secrets
@@ -765,20 +772,20 @@ cd infra/terraform
 terraform destroy -var "domain=$DOMAIN"
 
 # 5. Manual cleanup (Terraform doesn't catch these).
-aws logs delete-log-group --log-group-name /aws/eks/insur-iq-prod/insur-iq
+aws logs delete-log-group --log-group-name /aws/eks/cart-iq-prod/cart-iq
 # Secrets Manager soft-deletes for 7-30 days; force-delete only if intentional:
 for s in backend db redis auth llm; do
-  aws secretsmanager delete-secret --secret-id insur-iq/prod/$s --force-delete-without-recovery
+  aws secretsmanager delete-secret --secret-id cart-iq/prod/$s --force-delete-without-recovery
 done
 
 # 6. Verify nothing left billing.
-aws resourcegroupstaggingapi get-resources --tag-filters Key=Project,Values=insur-iq
+aws resourcegroupstaggingapi get-resources --tag-filters Key=Project,Values=cart-iq
 ```
 
 If `terraform destroy` fails on the S3 bucket because objects remain, empty it first:
 
 ```bash
-aws s3 rm s3://acmecorp-insur-iq-uploads --recursive
+aws s3 rm s3://acmecorp-cart-iq-uploads --recursive
 ```
 
 ---
@@ -788,8 +795,8 @@ aws s3 rm s3://acmecorp-insur-iq-uploads --recursive
 ### Pod CrashLoopBackOff
 
 ```bash
-kubectl -n insur-iq describe pod <pod>
-kubectl -n insur-iq logs <pod> --previous
+kubectl -n cart-iq describe pod <pod>
+kubectl -n cart-iq logs <pod> --previous
 ```
 
 Most common causes:
@@ -800,8 +807,8 @@ Most common causes:
 ### Migration Job failed
 
 ```bash
-kubectl -n insur-iq logs job/insur-iq-migrate
-kubectl -n insur-iq get job insur-iq-migrate -o yaml
+kubectl -n cart-iq logs job/cart-iq-migrate
+kubectl -n cart-iq get job cart-iq-migrate -o yaml
 ```
 
 Common causes:
@@ -813,31 +820,32 @@ Common causes:
 ```bash
 # Check queue depth on Redis
 redis-cli -h $REDIS_HOST LLEN celery
-redis-cli -h $REDIS_HOST LLEN policy_extract
+redis-cli -h $REDIS_HOST LLEN scraper
+redis-cli -h $REDIS_HOST LLEN scraper_listing
 
 # Check current celery replica counts
-kubectl -n insur-iq get deploy -l 'app.kubernetes.io/component in (celery-default,celery-policy-extract,celery-commission-intake)'
+kubectl -n cart-iq get deploy -l 'app.kubernetes.io/component in (celery-default,celery-scraper)'
 ```
 
 Celery workers run at fixed `replicas` — there is no autoscaling. To clear a backlog, bump the count in your values file and `helm upgrade`:
 
 ```yaml
 celery:
-  policyExtract: { replicas: 8 }   # was 4
+  scraper: { replicas: 3 }   # was 1
 ```
 
 ```bash
-helm upgrade insur-iq ./helm/insur-iq -n insur-iq \
-  -f helm/insur-iq/my-values.yaml
+helm upgrade cart-iq ./helm/cart-iq -n cart-iq \
+  -f helm/cart-iq/my-values.yaml
 ```
 
 For an emergency one-off bump (gets reverted by the next `helm upgrade`):
 
 ```bash
-kubectl -n insur-iq scale deploy/insur-iq-celery-policy-extract --replicas=8
+kubectl -n cart-iq scale deploy/cart-iq-cart-iq-celery-scraper --replicas=3
 ```
 
-If the backlog persists at high replica counts, investigate downstream LLM rate limits in Langfuse rather than scaling further.
+If the backlog persists at high replica counts, investigate scraper rate limits (`SCRAPER_*`) and target-site blocking rather than scaling further.
 
 ### RDS connection exhaustion
 
@@ -850,17 +858,17 @@ CloudWatch metric `DatabaseConnections` near `max_connections` (300):
 ### Pod Identity not working (S3 access denied)
 
 ```bash
-kubectl -n insur-iq exec deploy/insur-iq-backend -- aws sts get-caller-identity
+kubectl -n cart-iq exec deploy/cart-iq-backend -- aws sts get-caller-identity
 ```
 
 If this returns the **node** role and not the SA role, the Pod Identity association is missing or the agent isn't running:
 
 ```bash
-aws eks list-pod-identity-associations --cluster-name insur-iq-prod --namespace insur-iq
+aws eks list-pod-identity-associations --cluster-name cart-iq-prod --namespace cart-iq
 kubectl -n kube-system get daemonset eks-pod-identity-agent
 ```
 
-Reapply the association via Terraform or `aws eks create-pod-identity-association`, then `kubectl rollout restart deploy/insur-iq-backend`.
+Reapply the association via Terraform or `aws eks create-pod-identity-association`, then `kubectl rollout restart deploy/cart-iq-backend`.
 
 ### LBC webhook x509 certificate errors
 
@@ -896,8 +904,8 @@ Default ALB idle timeout is 60s; long PDF uploads exceed it. Set `ingress.idleTi
 Beat is a singleton. If it's evicted and not rescheduled, scheduled tasks stop silently. Detect via the CloudWatch alarm in [Appendix C](#appendix-c--cloudwatch-alarms). Recover:
 
 ```bash
-kubectl -n insur-iq rollout restart deploy/insur-iq-celery-beat
-kubectl -n insur-iq logs -l app.kubernetes.io/component=celery-beat --tail=50
+kubectl -n cart-iq rollout restart deploy/cart-iq-celery-beat
+kubectl -n cart-iq logs -l app.kubernetes.io/component=celery-beat --tail=50
 ```
 
 ### ECR pull failure
@@ -933,16 +941,16 @@ Common causes, in order of likelihood:
 
 | Symptom in CA logs | Cause | Fix |
 |---|---|---|
-| `Failed to fix node group sizes... AccessDenied` | Pod Identity association missing or IAM policy too narrow | Re-apply Terraform; verify `aws eks list-pod-identity-associations --namespace kube-system --cluster-name insur-iq-prod` shows `cluster-autoscaler` |
-| `no expandable node groups` | ASG at `max_size` already, or tags missing | Bump `max_size` in [terraform/main.tf](../../infra/terraform/main.tf) and re-apply, OR check ASG has the `k8s.io/cluster-autoscaler/enabled=true` and `k8s.io/cluster-autoscaler/insur-iq-prod=owned` tags |
+| `Failed to fix node group sizes... AccessDenied` | Pod Identity association missing or IAM policy too narrow | Re-apply Terraform; verify `aws eks list-pod-identity-associations --namespace kube-system --cluster-name cart-iq-prod` shows `cluster-autoscaler` |
+| `no expandable node groups` | ASG at `max_size` already, or tags missing | Bump `max_size` in [terraform/main.tf](../../infra/terraform/main.tf) and re-apply, OR check ASG has the `k8s.io/cluster-autoscaler/enabled=true` and `k8s.io/cluster-autoscaler/cart-iq-prod=owned` tags |
 | `pod didn't trigger scale-up: 1 node(s) had untolerated taint` | Pod can't schedule on the existing node group's instance type for unrelated reasons (taints, node selectors, GPU request, etc.) | Match pod requirements to node group, or add a new node group |
 | CA logs are silent | CA isn't picking up the pod — usually because the pod has no `requests.cpu`/`requests.memory` (CA only acts on resource requests, not actual usage) | Add `resources.requests` to the pod spec |
 
 ### HPA stuck / scaling weirdness
 
 ```bash
-kubectl -n insur-iq get hpa
-kubectl -n insur-iq describe hpa backend
+kubectl -n cart-iq get hpa
+kubectl -n cart-iq describe hpa backend
 ```
 
 | Symptom | Cause | Fix |
@@ -959,8 +967,8 @@ If autoscaling is broken and you need capacity *now*:
 # Force a node group up immediately. CA will leave manual changes alone
 # unless desired drops below min/rises above max.
 aws eks update-nodegroup-config \
-  --cluster-name insur-iq-prod \
-  --nodegroup-name $(aws eks list-nodegroups --cluster-name insur-iq-prod \
+  --cluster-name cart-iq-prod \
+  --nodegroup-name $(aws eks list-nodegroups --cluster-name cart-iq-prod \
                       --query 'nodegroups[?contains(@,`app`)] | [0]' --output text) \
   --scaling-config minSize=1,maxSize=3,desiredSize=3 \
   --region ap-south-1
@@ -1009,7 +1017,10 @@ Levers:
 | `DB_PORT` | SM `db` | no | `5432` |
 | `DB_USER` | SM `db` | yes | — |
 | `DB_PASSWORD` | SM `db` | yes | — |
-| `DB_NAME` | SM `db` | yes | `insure_iq` |
+| `DB_NAME` | SM `db` | yes | `cart_iq` |
+| `DB_NAME_AUTH` | SM `db` | yes | `auth` |
+| `PARITY_CHAT_DB_USER` | SM `db` | no | `cart_iq` (v1 reuses main user) |
+| `PARITY_CHAT_DB_PASSWORD` | SM `db` | no | (blank → inherits `DB_PASSWORD`) |
 | `CELERY_BROKER_URL` | SM `redis` | yes | — |
 | `CELERY_RESULT_BACKEND` | configmap | no | `django-db` |
 | `CELERY_CACHE_BACKEND` | configmap | no | `django-cache` |
@@ -1017,19 +1028,20 @@ Levers:
 | `AWS_STORAGE_BUCKET_NAME` | configmap | yes | — |
 | `AWS_S3_ENDPOINT_URL` | configmap | no | (blank for real S3) |
 | `AWS_S3_PUBLIC_ENDPOINT_URL` | configmap | no | (blank for real S3; set when fronting MinIO) |
-| `AWS_SENDER_EMAIL` | configmap | no | (blank disables outbound mail) |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | — | no (Pod Identity) | NOT set — see the AWS-credentials note in §7 and Appendix D |
 | `ALLOWED_HOSTS` | derived | no | `<domain>` |
 | `CSRF_TRUSTED_ORIGINS` | derived | no | `https://<domain>` |
 | `HOST_NAME` | derived | no | `https://<domain>` |
-| `LLM_PROVIDER` | SM `llm` | yes | `gemini` |
-| `GEMINI_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | SM `llm` | one required | — |
-| `GEMINI_MODEL` / `OPENAI_MODEL` / `ANTHROPIC_MODEL` | SM `llm` | no | sane defaults |
-| `GOOGLE_API_KEY` | SM `llm` | no | — |
-| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` | SM `llm` | no | — |
-| `LANGFUSE_HOST` | configmap | no | `https://cloud.langfuse.com` |
-| `MINERVA_API_URL` | configmap | no | — |
-| `EXCEL_AI_CLASSIFICATION_ENABLED` | configmap | no | `true` |
-| `POLICY_EXTRACT_CALLBACK_URL` | derived | no | `https://<domain>/service-api/policy-extract/callback/` |
+| `AI_PROVIDER` | SM `llm` | yes | `google` |
+| `GOOGLE_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | SM `llm` | one required | — |
+| `GROQ_API_KEY` / `TOGETHER_API_KEY` / `OLLAMA_API_BASE` | SM `llm` | no | — |
+| `EMBED_GOOGLE_API_KEY` | SM `llm` | no | (blank → inherits `GOOGLE_API_KEY`) |
+| `PARITY_CHAT_MODEL` | SM `llm` | no | `anthropic/claude-opus-4-7` |
+| `EMBED_MODEL` / `EMBED_DIMENSIONS` | configmap | no | `gemini-embedding-2` / `1536` |
+| `GEMINI_USE_VERTEX_AI` / `EMBED_USE_VERTEX_AI` | configmap | no | `False` / (inherits) |
+| `PARITY_CHAT_CACHE_ENABLED` / `ANTHROPIC_RATIONALES_ENABLED` | configmap | no | `False` |
+| `SCRAPER_DEFAULT_PINCODE` / `SCRAPER_MAX_CONCURRENCY` | configmap | no | `110001` / `3` |
+| `SCRAPER_RATE_LIMIT_ENABLED` / `SCRAPER_LISTING_PARTITION` | configmap | no | `True` |
 
 ### Web
 
@@ -1041,6 +1053,7 @@ Levers:
 | `NUXT_PUBLIC_API_SCHEME` | values | no | `https` |
 | `NUXT_APP_BASE_URL` | values | no | `/` (Nuxt subpath) |
 | `NUXT_PUBLIC_ENABLED_SOCIAL_PROVIDERS` | values | no | `""` |
+| `NUXT_PUBLIC_SCRAPER_DEFAULT_PINCODE` | values | no | `110001` |
 
 ### Auth (Better Auth)
 
@@ -1078,8 +1091,8 @@ Levers:
         "s3:ListBucket"
       ],
       "Resource": [
-        "arn:aws:s3:::acmecorp-insur-iq-uploads",
-        "arn:aws:s3:::acmecorp-insur-iq-uploads/*"
+        "arn:aws:s3:::acmecorp-cart-iq-uploads",
+        "arn:aws:s3:::acmecorp-cart-iq-uploads/*"
       ]
     }
   ]
@@ -1110,7 +1123,7 @@ Trust policy (same for both roles):
     {
       "Effect": "Allow",
       "Action": ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
-      "Resource": "arn:aws:secretsmanager:ap-south-1:123456789012:secret:insur-iq/*"
+      "Resource": "arn:aws:secretsmanager:ap-south-1:123456789012:secret:cart-iq/*"
     }
   ]
 }
@@ -1141,13 +1154,13 @@ Trust policy (same for both roles):
 
 ## Appendix C — CloudWatch Alarms
 
-The minimal alarm set for prod. Each alarm fires to an SNS topic (`insur-iq-prod-alerts`) which fans out to email/Slack. Container-level metrics (pod restarts, beat heartbeat) come from CloudWatch Container Insights — installed automatically via the `amazon-cloudwatch-observability` EKS addon.
+The minimal alarm set for prod. Each alarm fires to an SNS topic (`cart-iq-prod-alerts`) which fans out to email/Slack. Container-level metrics (pod restarts, beat heartbeat) come from CloudWatch Container Insights — installed automatically via the `amazon-cloudwatch-observability` EKS addon.
 
 **Set up the SNS topic first** (one-time):
 
 ```bash
-aws sns create-topic --name insur-iq-prod-alerts --region "$AWS_REGION"
-aws sns subscribe --topic-arn "arn:aws:sns:${AWS_REGION}:${AWS_ACCOUNT_ID}:insur-iq-prod-alerts" \
+aws sns create-topic --name cart-iq-prod-alerts --region "$AWS_REGION"
+aws sns subscribe --topic-arn "arn:aws:sns:${AWS_REGION}:${AWS_ACCOUNT_ID}:cart-iq-prod-alerts" \
   --protocol email --notification-endpoint oncall@acmecorp.com
 # (confirm via the email link)
 ```
@@ -1155,12 +1168,12 @@ aws sns subscribe --topic-arn "arn:aws:sns:${AWS_REGION}:${AWS_ACCOUNT_ID}:insur
 Then create the alarms:
 
 ```bash
-TOPIC="arn:aws:sns:${AWS_REGION}:${AWS_ACCOUNT_ID}:insur-iq-prod-alerts"
-ALB=$(aws elbv2 describe-load-balancers --query 'LoadBalancers[?contains(LoadBalancerName,`insur-iq`)].LoadBalancerArn' --output text | awk -F'loadbalancer/' '{print $2}')
+TOPIC="arn:aws:sns:${AWS_REGION}:${AWS_ACCOUNT_ID}:cart-iq-prod-alerts"
+ALB=$(aws elbv2 describe-load-balancers --query 'LoadBalancers[?contains(LoadBalancerName,`cart-iq`)].LoadBalancerArn' --output text | awk -F'loadbalancer/' '{print $2}')
 
 # 1. ALB 5xx rate > 1% over 5 min
 aws cloudwatch put-metric-alarm \
-  --alarm-name insur-iq-alb-5xx-high \
+  --alarm-name cart-iq-alb-5xx-high \
   --metric-name HTTPCode_Target_5XX_Count --namespace AWS/ApplicationELB \
   --statistic Sum --period 300 --evaluation-periods 1 \
   --threshold 50 --comparison-operator GreaterThanThreshold \
@@ -1169,66 +1182,66 @@ aws cloudwatch put-metric-alarm \
 
 # 2. RDS CPU > 80% for 10 min
 aws cloudwatch put-metric-alarm \
-  --alarm-name insur-iq-rds-cpu-high \
+  --alarm-name cart-iq-rds-cpu-high \
   --metric-name CPUUtilization --namespace AWS/RDS \
   --statistic Average --period 300 --evaluation-periods 2 \
   --threshold 80 --comparison-operator GreaterThanThreshold \
-  --dimensions Name=DBInstanceIdentifier,Value=insur-iq-prod \
+  --dimensions Name=DBInstanceIdentifier,Value=cart-iq-prod \
   --alarm-actions $TOPIC
 
 # 3. RDS free storage < 20 GiB
 aws cloudwatch put-metric-alarm \
-  --alarm-name insur-iq-rds-storage-low \
+  --alarm-name cart-iq-rds-storage-low \
   --metric-name FreeStorageSpace --namespace AWS/RDS \
   --statistic Average --period 300 --evaluation-periods 2 \
   --threshold 21474836480 --comparison-operator LessThanThreshold \
-  --dimensions Name=DBInstanceIdentifier,Value=insur-iq-prod \
+  --dimensions Name=DBInstanceIdentifier,Value=cart-iq-prod \
   --alarm-actions $TOPIC
 
 # 4. ElastiCache evictions (any) over 5 min
 aws cloudwatch put-metric-alarm \
-  --alarm-name insur-iq-redis-evictions \
+  --alarm-name cart-iq-redis-evictions \
   --metric-name Evictions --namespace AWS/ElastiCache \
   --statistic Sum --period 300 --evaluation-periods 1 \
   --threshold 0 --comparison-operator GreaterThanThreshold \
-  --dimensions Name=CacheClusterId,Value=insur-iq-prod \
+  --dimensions Name=CacheClusterId,Value=cart-iq-prod \
   --alarm-actions $TOPIC
 
 # 5. Pod restart rate > 5 in 5 min, anywhere in the namespace
 #    (Container Insights metric — verify it appears under ContainerInsights namespace after the addon is healthy)
 aws cloudwatch put-metric-alarm \
-  --alarm-name insur-iq-pod-restarts-high \
+  --alarm-name cart-iq-pod-restarts-high \
   --metric-name pod_number_of_container_restarts \
   --namespace ContainerInsights \
   --statistic Sum --period 300 --evaluation-periods 1 \
   --threshold 5 --comparison-operator GreaterThanThreshold \
-  --dimensions Name=ClusterName,Value=insur-iq-prod Name=Namespace,Value=insur-iq \
+  --dimensions Name=ClusterName,Value=cart-iq-prod Name=Namespace,Value=cart-iq \
   --alarm-actions $TOPIC
 
 # 6. Celery beat singleton missing (running pods == 0)
 aws cloudwatch put-metric-alarm \
-  --alarm-name insur-iq-beat-down \
+  --alarm-name cart-iq-beat-down \
   --metric-name pod_number_of_running_containers \
   --namespace ContainerInsights \
   --statistic Average --period 300 --evaluation-periods 2 \
   --threshold 1 --comparison-operator LessThanThreshold \
   --treat-missing-data breaching \
-  --dimensions Name=ClusterName,Value=insur-iq-prod Name=Namespace,Value=insur-iq Name=PodName,Value=insur-iq-celery-beat \
+  --dimensions Name=ClusterName,Value=cart-iq-prod Name=Namespace,Value=cart-iq Name=PodName,Value=cart-iq-celery-beat \
   --alarm-actions $TOPIC
 ```
 
 | # | Alarm | Triggers when | Why |
 |---|---|---|---|
-| 1 | `insur-iq-alb-5xx-high` | >50 5xx in 5 min (~1% at 1k req/min) | Backend or auth crashing in flight |
-| 2 | `insur-iq-rds-cpu-high` | RDS CPU >80% for 10 min | Slow queries, missing index, traffic spike |
-| 3 | `insur-iq-rds-storage-low` | Free storage <20 GiB | Disk-full will silently break writes |
-| 4 | `insur-iq-redis-evictions` | Any eviction in 5 min | Celery results / cache pressure — bump `cache.t4g.small` to `medium` |
-| 5 | `insur-iq-pod-restarts-high` | >5 container restarts in 5 min in namespace | OOMKill or CrashLoop somewhere |
-| 6 | `insur-iq-beat-down` | Celery beat pod count <1 for 10 min | Scheduled tasks have silently stopped |
+| 1 | `cart-iq-alb-5xx-high` | >50 5xx in 5 min (~1% at 1k req/min) | Backend or auth crashing in flight |
+| 2 | `cart-iq-rds-cpu-high` | RDS CPU >80% for 10 min | Slow queries, missing index, traffic spike |
+| 3 | `cart-iq-rds-storage-low` | Free storage <20 GiB | Disk-full will silently break writes |
+| 4 | `cart-iq-redis-evictions` | Any eviction in 5 min | Celery results / cache pressure — bump `cache.t4g.small` to `medium` |
+| 5 | `cart-iq-pod-restarts-high` | >5 container restarts in 5 min in namespace | OOMKill or CrashLoop somewhere |
+| 6 | `cart-iq-beat-down` | Celery beat pod count <1 for 10 min | Scheduled tasks have silently stopped |
 
 **Migration backstop:** the chart's `migrate` Job sets release status to `failed` on Helm — so a failed migration aborts the deploy and old pods keep serving. No alarm needed; CI surfaces the failure. If you want belt-and-suspenders, alarm on `kube_job_failed` once you migrate to AMP.
 
-**LLM rate-limit / cost** (queue backlog, Langfuse error rate): these don't have CloudWatch metrics today. If they matter, emit them from Django via `boto3.client('cloudwatch').put_metric_data(...)` and add alarms — that's typically the first reason teams adopt Prometheus instead.
+**AI rate-limit / cost and scraper backlog** (queue depth, provider 429s, target-site blocking): these don't have CloudWatch metrics today. If they matter, emit them from Django via `boto3.client('cloudwatch').put_metric_data(...)` and add alarms — that's typically the first reason teams adopt Prometheus instead.
 
 ---
 
@@ -1244,7 +1257,7 @@ aws cloudwatch put-metric-alarm \
 | Migrations | Helm pre-install/pre-upgrade Job | Runs once per release; failure aborts rollout |
 | Auth DB | Separate `auth` DB on same RDS instance | Cheaper than two instances; isolation via DB grants |
 | DB pooling | RDS Proxy in front of single instance | Multiplexes Django + celery; smooths failover |
-| Celery autoscaling | None — fixed `replicas` per queue | Simplest possible; LLM-bound workers make CPU HPA ineffective. Resize via `helm upgrade` when a queue is consistently backlogged |
+| Celery autoscaling | None — fixed `replicas` per queue | Simplest possible; I/O-bound workers make CPU HPA ineffective. Resize via `helm upgrade` when a queue is consistently backlogged |
 | Backend autoscaling | HPA on CPU @70% | CPU-bound for synchronous request handling |
 | Beat | Deployment replicas=1, Recreate | Singleton enforced by strategy + alert |
 | Identity | EKS Pod Identity (not IRSA) | Simpler than OIDC trust dance; AWS recommended for new clusters |
@@ -1258,3 +1271,9 @@ aws cloudwatch put-metric-alarm \
 | Metrics | CloudWatch Container Insights (EKS addon) | Zero pods on cluster, AWS-native; AMP/AMG or self-hosted Prometheus is future work when custom app metrics are needed |
 | Backups | RDS automated 7d + manual pre-upgrade | Plus Helm history for app rollback |
 | Security baseline | PSA `restricted`, NetworkPolicy default-deny | Defense in depth with minimum operational drag |
+| Celery queues (cart-iq retarget) | `default` (queue `celery`) + `scraper` (`scraper_listing,scraper`) + `beat` | Mirrors the app's `CELERY_TASK_ROUTES`; replaced the old insurance queues (`policy_extract`, `commission_intake`) |
+| Scraper worker | Separate `cart-iq/scraper` image (Playwright/Chromium), **prefork** pool, `--max-tasks-per-child=20`, `--prefetch-multiplier=1`, writable `/dev/shm` | A hung browser task must be killable by `--time-limit` (threads can't); recycle caps Chromium memory; `/dev/shm` emptyDir keeps `readOnlyRootFilesystem` intact |
+| pgvector | Enabled on `cart_iq` by the db-init Job (before migrate) | cart-iq stores embeddings in `vector` columns; the extension must exist before Django migrations |
+| Parity-chat DB role | v1 reuses the main `cart_iq` user (`PARITY_CHAT_DB_USER=cart_iq`) | Avoids provisioning a separate read-only role for the first cut; harden later by creating `chat_readonly` |
+| GPU node group | Removed | cart-iq uses API-based embeddings/inference; no self-hosted local models. Re-add only for ollama/local inference |
+| AWS credentials | Pod Identity only; AWS keys NOT set | `settings.py` declares `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` as required — the app must default them blank, else setting them would break boto3's Pod Identity credential chain |

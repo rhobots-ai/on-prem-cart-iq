@@ -1,7 +1,7 @@
-site_name: insur-iq Deployment Docs
-site_description: Deployment guide for running insur-iq on a customer-managed AWS EKS cluster
-repo_url: https://github.com/rhobots-ai/on-prem-insur-iq
-repo_name: rhobots-ai/on-prem-insur-iq
+site_name: cart-iq Deployment Docs
+site_description: Deployment guide for running cart-iq on a customer-managed AWS EKS cluster
+repo_url: https://github.com/rhobots-ai/on-prem-cart-iq
+repo_name: rhobots-ai/on-prem-cart-iq
 docs_dir: docs
 
 theme:
