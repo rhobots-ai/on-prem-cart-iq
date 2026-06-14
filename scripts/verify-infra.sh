@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# verify-infra.sh — post-Terraform infra check before `helm install insur-iq`.
+# verify-infra.sh — post-Terraform infra check before `helm install cart-iq`.
 # Run this AFTER `terraform apply` succeeds. For pre-Terraform local-env
 # checks (tooling, AWS creds), see preflight.sh.
 #
@@ -8,13 +8,13 @@
 # Usage:
 #   ENV=prod \
 #   AWS_REGION=ap-south-1 \
-#   CLUSTER_NAME=insur-iq-prod \
-#   NAMESPACE=insur-iq \
-#   DOMAIN=insuriq.acmecorp.com \
+#   CLUSTER_NAME=cart-iq-prod \
+#   NAMESPACE=cart-iq \
+#   DOMAIN=cartiq.acmecorp.com \
 #   ACM_CERT_ARN=arn:aws:acm:ap-south-1:123:certificate/xxx \
-#   RDS_PROXY_ENDPOINT=insur-iq-prod-proxy.proxy-xxx.ap-south-1.rds.amazonaws.com \
+#   RDS_PROXY_ENDPOINT=cart-iq-prod-proxy.proxy-xxx.ap-south-1.rds.amazonaws.com \
 #   REDIS_ENDPOINT=xxx.aps1.cache.amazonaws.com:6379 \
-#   S3_BUCKET=acmecorp-insur-iq-uploads \
+#   S3_BUCKET=acmecorp-cart-iq-uploads \
 #   ./verify-infra.sh
 #
 # Tip: feed Terraform outputs directly:
@@ -42,7 +42,7 @@ check() {
 : "${ENV:?must set ENV}"
 : "${AWS_REGION:?must set AWS_REGION}"
 : "${CLUSTER_NAME:?must set CLUSTER_NAME}"
-: "${NAMESPACE:=insur-iq}"
+: "${NAMESPACE:=cart-iq}"
 : "${DOMAIN:?must set DOMAIN}"
 : "${ACM_CERT_ARN:?must set ACM_CERT_ARN}"
 : "${RDS_PROXY_ENDPOINT:?must set RDS_PROXY_ENDPOINT}"
@@ -77,7 +77,7 @@ check "ACM cert is ISSUED"                         "aws acm describe-certificate
 
 echo "── Secrets Manager ──"
 for grp in backend db redis auth llm; do
-  check "SM secret insur-iq/$ENV/$grp exists"     "aws secretsmanager describe-secret --secret-id insur-iq/$ENV/$grp --region $AWS_REGION"
+  check "SM secret cart-iq/$ENV/$grp exists"     "aws secretsmanager describe-secret --secret-id cart-iq/$ENV/$grp --region $AWS_REGION"
 done
 
 echo "── ClusterSecretStore ──"
