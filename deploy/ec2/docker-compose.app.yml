@@ -1,0 +1,285 @@
+# cart-iq application stack — runs on the app EC2 box, behind an ALB.
+# Mirrors the EKS Helm chart's workloads, with prebuilt ECR images instead of
+# local builds. Config comes from app.env (copy app.env.example → app.env, never
+# commit it).
+#
+#   # one-shot bootstrap (creates the auth DB + pgvector, runs Django migrations):
+#   docker compose -f docker-compose.app.yml --env-file app.env run --rm authdb
+#   docker compose -f docker-compose.app.yml --env-file app.env run --rm migrate
+#   # then bring the long-running services up:
+#   docker compose -f docker-compose.app.yml --env-file app.env up -d
+#
+# Variables below interpolate from app.env (the `${VAR}` form). The app-box nginx
+# strips the /service-api and /auth prefixes, so the backend serves bare /api/...
+# paths (no SCRIPT_NAME) — intra-stack calls use bare paths too.
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: always
+    ports:
+      - "80:80"                       # ALB → nginx (TLS terminates at the ALB)
+    volumes:
+      - ./nginx/cart-iq.conf:/etc/nginx/conf.d/default.conf:ro
+      - operator-static:/app/static:ro
+    depends_on:
+      - auth
+      - backend
+      - web
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  auth:
+    image: rhobotsai/auth:${AUTH_TAG:-latest}
+    command: ["start"]
+    restart: always
+    environment:
+      NODE_ENV: production
+      # The app-box nginx already strips /auth/, so the auth app is reached
+      # directly on :10000 (cart-iq's EKS nginx sidecar is unnecessary here).
+      PORT: "10000"
+      BASE_DOMAIN: ${DOMAIN}
+      BETTER_AUTH_URL: https://${DOMAIN}/auth
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      TRUSTED_ORIGINS: https://${DOMAIN}
+      # ?sslmode=require: RDS enforces rds.force_ssl=1 (see infra/terraform-ec2),
+      # and Better Auth's node-postgres client does not negotiate TLS by default.
+      DATABASE_STRING: postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME_AUTH}?sslmode=require
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-false}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      AWS_REGION: ${AWS_REGION}
+      AWS_STORAGE_BUCKET_NAME: ${AWS_STORAGE_BUCKET_NAME}
+      AWS_SENDER_EMAIL: ${AWS_SENDER_EMAIL:-}
+      WEBHOOK_SECRET_KEY: ${WEBHOOK_SECRET_KEY}
+      WEBHOOK_EP: http://backend:8000/api/auth/webhook/
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10000/api/auth/ok"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  backend:
+    image: ${ECR_REGISTRY}/cart-iq/backend:${BACKEND_TAG}
+    command:
+      - gunicorn
+      - config.wsgi:application
+      - --bind=0.0.0.0:8000
+      - --workers=5
+      - --threads=4
+      - --worker-class=gthread
+      - --timeout=300
+      - --graceful-timeout=30
+      - --access-logfile=-
+      - --error-logfile=-
+    restart: always
+    volumes:
+      - operator-static:/app/static
+    environment: &backend-env
+      DEBUG: ${DEBUG:-False}
+      APP_ENV: ${APP_ENV:-PROD}
+      SECRET_KEY: ${SECRET_KEY}
+      WEBHOOK_SECRET_KEY: ${WEBHOOK_SECRET_KEY}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
+      HOST_NAME: ${HOST_NAME}
+      # Public auth URL (matches the chart's backendDerivedEnv) so token issuer
+      # validation lines up with what the browser saw; routes back via nginx.
+      BETTER_AUTH_URL: https://${DOMAIN}/auth
+      # Database — direct to RDS (no Proxy). AWS_ACCESS_KEY_ID / SECRET are
+      # intentionally unset: boto3 uses the EC2 instance-profile credentials,
+      # the same reasoning as the EKS Pod-Identity note in values.yaml.
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      PARITY_CHAT_DB_USER: ${PARITY_CHAT_DB_USER:-}
+      PARITY_CHAT_DB_PASSWORD: ${PARITY_CHAT_DB_PASSWORD:-}
+      AWS_REGION: ${AWS_REGION}
+      AWS_S3_REGION_NAME: ${AWS_REGION}
+      AWS_STORAGE_BUCKET_NAME: ${AWS_STORAGE_BUCKET_NAME}
+      AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-}
+      AWS_S3_PUBLIC_ENDPOINT_URL: ${AWS_S3_PUBLIC_ENDPOINT_URL:-}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-django-db}
+      CELERY_CACHE_BACKEND: ${CELERY_CACHE_BACKEND:-django-cache}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      # Embedding + parity-chat tuning.
+      EMBED_MODEL: ${EMBED_MODEL:-gemini-embedding-2}
+      EMBED_DIMENSIONS: ${EMBED_DIMENSIONS:-1536}
+      GEMINI_USE_VERTEX_AI: ${GEMINI_USE_VERTEX_AI:-False}
+      EMBED_USE_VERTEX_AI: ${EMBED_USE_VERTEX_AI:-}
+      PARITY_CHAT_CACHE_ENABLED: ${PARITY_CHAT_CACHE_ENABLED:-False}
+      ANTHROPIC_RATIONALES_ENABLED: ${ANTHROPIC_RATIONALES_ENABLED:-False}
+      PARITY_CHAT_MODEL: ${PARITY_CHAT_MODEL:-anthropic/claude-opus-4-7}
+      # AI provider + keys (only the selected provider's key is read).
+      AI_PROVIDER: ${AI_PROVIDER:-google}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      EMBED_GOOGLE_API_KEY: ${EMBED_GOOGLE_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      TOGETHER_API_KEY: ${TOGETHER_API_KEY:-}
+      OLLAMA_API_BASE: ${OLLAMA_API_BASE:-}
+      # Scraper tunables.
+      SCRAPER_DEFAULT_PINCODE: ${SCRAPER_DEFAULT_PINCODE:-110001}
+      SCRAPER_MAX_CONCURRENCY: ${SCRAPER_MAX_CONCURRENCY:-3}
+      SCRAPER_RATE_LIMIT_ENABLED: ${SCRAPER_RATE_LIMIT_ENABLED:-True}
+      SCRAPER_LISTING_PARTITION: ${SCRAPER_LISTING_PARTITION:-True}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---- Celery workers — one service per queue class (mirrors the chart) ------
+  # General-purpose worker — default queue (parity/catalogue tasks).
+  celery_default:
+    image: ${ECR_REGISTRY}/cart-iq/backend:${BACKEND_TAG}
+    command:
+      - celery
+      - -A
+      - config
+      - worker
+      - --loglevel=INFO
+      - --queues=celery
+      - --concurrency=4
+      - --hostname=default@%h
+    restart: always
+    environment: *backend-env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # Browser scraper worker — Playwright/Chromium image, prefork pool so a hung
+  # browser task is killable by --time-limit, recycles processes to cap Chromium
+  # memory. Chromium maps shared memory under /dev/shm; the default (64Mi) crashes
+  # tabs, so shm_size lifts it. HOME/XDG/TMPDIR point at writable /tmp.
+  celery_scraper:
+    image: ${ECR_REGISTRY}/cart-iq/scraper:${SCRAPER_TAG}
+    command:
+      - celery
+      - -A
+      - config
+      - worker
+      - --loglevel=INFO
+      - --queues=scraper_listing,scraper
+      - --concurrency=3
+      - --pool=prefork
+      - --hostname=scraper@%h
+      - --max-tasks-per-child=20
+      - --prefetch-multiplier=1
+      - --time-limit=700
+      - --soft-time-limit=600
+    restart: always
+    shm_size: "1gb"
+    environment:
+      <<: *backend-env
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp/.cache
+      XDG_CONFIG_HOME: /tmp/.config
+      TMPDIR: /tmp
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  beat:
+    image: ${ECR_REGISTRY}/cart-iq/backend:${BACKEND_TAG}
+    # Singleton — never run more than one.
+    command:
+      - celery
+      - -A
+      - config
+      - beat
+      - --loglevel=INFO
+      - --scheduler=django_celery_beat.schedulers:DatabaseScheduler
+    restart: always
+    environment: *backend-env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  web:
+    # NUXT_PUBLIC_* URLs are read by the Nuxt SSR server. The browser reaches the
+    # API/auth through the public ALB → nginx (which strips /service-api, /auth).
+    image: ${ECR_REGISTRY}/cart-iq/web:${WEB_TAG}
+    restart: always
+    environment:
+      NODE_ENV: production
+      NUXT_PUBLIC_API_BASE_URL: ${DOMAIN}/service-api
+      NUXT_PUBLIC_AUTH_BASE_URL: https://${DOMAIN}/auth/api/auth
+      NUXT_PUBLIC_APP_BASE_URL: https://${DOMAIN}
+      NUXT_PUBLIC_API_SCHEME: ${NUXT_PUBLIC_API_SCHEME:-https}
+      NUXT_APP_BASE_URL: /
+      NUXT_PUBLIC_ENABLED_SOCIAL_PROVIDERS: ${NUXT_PUBLIC_ENABLED_SOCIAL_PROVIDERS:-}
+      NUXT_PUBLIC_SCRAPER_DEFAULT_PINCODE: ${SCRAPER_DEFAULT_PINCODE:-110001}
+    depends_on:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ---- One-shot tools (profile "tools") --------------------------------------
+  # Run both once, before the first `up`. They are not part of `up -d`.
+
+  # Ensure the `auth` logical DB exists and pgvector is enabled on the app DB.
+  # Mirrors the EKS auth-db-init Job: cart-iq stores embeddings in vector columns,
+  # so the extension must exist before Django migrations run. Idempotent.
+  #   docker compose -f docker-compose.app.yml --env-file app.env run --rm authdb
+  authdb:
+    image: postgres:16-alpine
+    profiles: ["tools"]
+    environment:
+      PGPASSWORD: ${DB_PASSWORD}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        EXISTS=$$(psql -h "${DB_HOST}" -p "${DB_PORT:-5432}" -U "${DB_USER}" -d postgres -tAc \
+          "SELECT 1 FROM pg_database WHERE datname='${DB_NAME_AUTH}'")
+        if [ "$$EXISTS" != "1" ]; then
+          psql -h "${DB_HOST}" -p "${DB_PORT:-5432}" -U "${DB_USER}" -d postgres \
+            -c "CREATE DATABASE \"${DB_NAME_AUTH}\""
+          echo "Created database ${DB_NAME_AUTH}"
+        else
+          echo "Database ${DB_NAME_AUTH} already exists"
+        fi
+        psql -h "${DB_HOST}" -p "${DB_PORT:-5432}" -U "${DB_USER}" -d "${DB_NAME}" \
+          -c "CREATE EXTENSION IF NOT EXISTS vector"
+        echo "Ensured pgvector extension on ${DB_NAME}"
+
+  # Run Django migrations against the app DB (the EKS path runs these in the
+  # migrate pre-install Job).
+  #   docker compose -f docker-compose.app.yml --env-file app.env run --rm migrate
+  migrate:
+    image: ${ECR_REGISTRY}/cart-iq/backend:${BACKEND_TAG}
+    profiles: ["tools"]
+    command: ["python", "manage.py", "migrate", "--noinput"]
+    environment: *backend-env
+
+networks:
+  default:
+    name: cart_iq_network
+
+volumes:
+  operator-static:
+    driver: local
