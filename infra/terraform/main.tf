@@ -17,8 +17,8 @@ module "vpc" {
   single_nat_gateway   = true
   enable_dns_hostnames = true
 
-  public_subnet_tags  = { "kubernetes.io/role/elb"           = "1" }
-  private_subnet_tags = { "kubernetes.io/role/internal-elb"  = "1" }
+  public_subnet_tags  = { "kubernetes.io/role/elb" = "1" }
+  private_subnet_tags = { "kubernetes.io/role/internal-elb" = "1" }
 }
 
 resource "aws_vpc_endpoint" "s3" {
@@ -100,23 +100,10 @@ module "eks" {
         "k8s.io/cluster-autoscaler/${var.name}-${var.env}" = "owned"
       }
     }
-    gpu = {
-      ami_type       = "AL2_x86_64_GPU"
-      instance_types = ["g5.2xlarge"]
-      min_size       = 1
-      max_size       = 2
-      desired_size   = 1
-      labels         = { role = "gpu" }
-      taints = [{
-        key    = "nvidia.com/gpu"
-        value  = "true"
-        effect = "NO_SCHEDULE"
-      }]
-      tags = {
-        "k8s.io/cluster-autoscaler/enabled"                = "true"
-        "k8s.io/cluster-autoscaler/${var.name}-${var.env}" = "owned"
-      }
-    }
+    # No GPU node group: cart-iq uses API-based embeddings/inference
+    # (google/openai/anthropic), not self-hosted local models. Add a GPU group
+    # (+ nvidia device plugin and a matching toleration) only if you adopt
+    # self-hosted ollama or another local-model workload.
   }
 }
 
@@ -127,10 +114,10 @@ module "rds" {
   source  = "terraform-aws-modules/rds/aws"
   version = "~> 6.7"
 
-  identifier        = "${var.name}-${var.env}"
-  engine            = "postgres"
-  engine_version    = "16"
-  family            = "postgres16"
+  identifier           = "${var.name}-${var.env}"
+  engine               = "postgres"
+  engine_version       = "16"
+  family               = "postgres16"
   major_engine_version = "16"
 
   instance_class    = var.rds_instance_class
@@ -138,8 +125,8 @@ module "rds" {
   storage_type      = "gp3"
   storage_encrypted = true
 
-  db_name  = "insure_iq"
-  username = "insur_iq"
+  db_name                     = "cart_iq"
+  username                    = "cart_iq"
   manage_master_user_password = true
 
   multi_az = var.rds_multi_az
@@ -147,14 +134,14 @@ module "rds" {
   vpc_security_group_ids = [aws_security_group.rds.id]
   db_subnet_group_name   = module.vpc.database_subnet_group_name
 
-  backup_retention_period = 7
-  backup_window           = "03:00-04:00"
-  maintenance_window      = "Mon:04:00-Mon:05:00"
+  backup_retention_period      = 7
+  backup_window                = "03:00-04:00"
+  maintenance_window           = "Mon:04:00-Mon:05:00"
   performance_insights_enabled = true
 
   parameters = [
-    { name = "rds.force_ssl",                value = "1" },
-    { name = "log_min_duration_statement",   value = "500" },
+    { name = "rds.force_ssl", value = "1" },
+    { name = "log_min_duration_statement", value = "500" },
   ]
 }
 
@@ -162,10 +149,10 @@ resource "aws_security_group" "rds" {
   name   = "${var.name}-${var.env}-rds"
   vpc_id = module.vpc.vpc_id
   ingress {
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    cidr_blocks     = module.vpc.private_subnets_cidr_blocks
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = module.vpc.private_subnets_cidr_blocks
   }
   egress {
     from_port   = 0
@@ -207,7 +194,7 @@ resource "aws_db_proxy_target" "this" {
 resource "aws_iam_role" "rds_proxy" {
   name = "${var.name}-${var.env}-rds-proxy"
   assume_role_policy = jsonencode({
-    Version = "2012-10-17",
+    Version   = "2012-10-17",
     Statement = [{ Effect = "Allow", Principal = { Service = "rds.amazonaws.com" }, Action = "sts:AssumeRole" }]
   })
 }
@@ -451,7 +438,7 @@ resource "aws_eks_pod_identity_association" "aws_load_balancer_controller" {
 ################################################################################
 # External Secrets Operator — IAM role + Pod Identity association.
 # Reads from Secrets Manager and projects values into K8s Secret objects.
-# Scoped to the insur-iq/* namespace so it cannot read unrelated secrets.
+# Scoped to the cart-iq/* namespace so it cannot read unrelated secrets.
 ################################################################################
 resource "aws_iam_role" "external_secrets" {
   name               = "${var.name}-${var.env}-external-secrets"

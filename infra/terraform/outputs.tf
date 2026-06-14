@@ -1,31 +1,31 @@
-output "vpc_id"             { value = module.vpc.vpc_id }
+output "vpc_id" { value = module.vpc.vpc_id }
 output "private_subnet_ids" { value = module.vpc.private_subnets }
 output "private_subnet_cidrs" { value = module.vpc.private_subnets_cidr_blocks }
 
-output "eks_cluster_name"     { value = module.eks.cluster_name }
+output "eks_cluster_name" { value = module.eks.cluster_name }
 output "eks_cluster_endpoint" { value = module.eks.cluster_endpoint }
 output "eks_oidc_provider_arn" { value = module.eks.oidc_provider_arn }
 
-output "rds_endpoint"            { value = module.rds.db_instance_endpoint }
-output "rds_proxy_endpoint"      { value = aws_db_proxy.this.endpoint }
-output "rds_master_secret_arn"   { value = module.rds.db_instance_master_user_secret_arn }
+output "rds_endpoint" { value = module.rds.db_instance_endpoint }
+output "rds_proxy_endpoint" { value = aws_db_proxy.this.endpoint }
+output "rds_master_secret_arn" { value = module.rds.db_instance_master_user_secret_arn }
 
 output "redis_endpoint" {
   value = "${aws_elasticache_cluster.redis.cache_nodes[0].address}:${aws_elasticache_cluster.redis.cache_nodes[0].port}"
 }
 
 output "s3_bucket_name" { value = aws_s3_bucket.uploads.id }
-output "s3_bucket_arn"  { value = aws_s3_bucket.uploads.arn }
+output "s3_bucket_arn" { value = aws_s3_bucket.uploads.arn }
 
 output "acm_certificate_arn" { value = local.acm_certificate_arn }
 
 output "pod_identity_backend_role_arn" { value = aws_iam_role.backend_pod.arn }
-output "pod_identity_celery_role_arn"  { value = aws_iam_role.celery_pod.arn }
+output "pod_identity_celery_role_arn" { value = aws_iam_role.celery_pod.arn }
 
 # Cluster controller role ARNs (created by Terraform, consumed by helm installs in §5).
-output "cluster_autoscaler_role_arn"           { value = aws_iam_role.cluster_autoscaler.arn }
+output "cluster_autoscaler_role_arn" { value = aws_iam_role.cluster_autoscaler.arn }
 output "aws_load_balancer_controller_role_arn" { value = aws_iam_role.aws_load_balancer_controller.arn }
-output "external_secrets_role_arn"             { value = aws_iam_role.external_secrets.arn }
+output "external_secrets_role_arn" { value = aws_iam_role.external_secrets.arn }
 
 output "secrets_arns" {
   value = {
@@ -63,10 +63,13 @@ output "helm_values_snippet" {
     # CI overrides it per release (e.g. --set image.backend.tag=git-<sha>).
     image:
       backend:
-        repository: ${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com/insur-iq/backend
+        repository: ${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com/cart-iq/backend
         tag: dev
       web:
-        repository: ${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com/insur-iq/web
+        repository: ${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com/cart-iq/web
+        tag: dev
+      scraper:
+        repository: ${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com/cart-iq/scraper
         tag: dev
 
     # Pod Identity role ARNs for app workloads. The chart's ServiceAccounts
