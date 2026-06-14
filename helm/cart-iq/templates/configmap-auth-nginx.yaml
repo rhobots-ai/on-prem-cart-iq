@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "insur-iq.fullname" . }}-auth-nginx
+  name: {{ include "cart-iq.fullname" . }}-auth-nginx
   labels:
-    {{- include "insur-iq.labels" . | nindent 4 }}
+    {{- include "cart-iq.labels" . | nindent 4 }}
 data:
   nginx.conf: |
     worker_processes 1;

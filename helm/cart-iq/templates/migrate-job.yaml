@@ -2,9 +2,9 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "insur-iq.fullname" . }}-migrate
+  name: {{ include "cart-iq.fullname" . }}-migrate
   labels:
-    {{- include "insur-iq.labels" . | nindent 4 }}
+    {{- include "cart-iq.labels" . | nindent 4 }}
     app.kubernetes.io/component: migrate
   annotations:
     helm.sh/hook: pre-install,pre-upgrade
@@ -16,30 +16,30 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "insur-iq.selectorLabels" . | nindent 8 }}
+        {{- include "cart-iq.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: migrate
     spec:
       restartPolicy: Never
-      serviceAccountName: {{ include "insur-iq.sa.celery" . }}
+      serviceAccountName: {{ include "cart-iq.sa.celery" . }}
       securityContext:
-        {{- include "insur-iq.podSecurityContext" . | nindent 8 }}
+        {{- include "cart-iq.podSecurityContext" . | nindent 8 }}
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets: {{ toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
-        {{- include "insur-iq.waitForSecret" . | nindent 8 }}
+        {{- include "cart-iq.waitForSecret" . | nindent 8 }}
       containers:
         - name: migrate
-          image: {{ include "insur-iq.image.backend" . }}
+          image: {{ include "cart-iq.image.backend" . }}
           imagePullPolicy: {{ .Values.image.backend.pullPolicy }}
           command: {{ toJson .Values.migrate.command }}
           envFrom:
-            {{- include "insur-iq.backendEnvFrom" . | nindent 12 }}
+            {{- include "cart-iq.backendEnvFrom" . | nindent 12 }}
           env:
-            {{- include "insur-iq.backendDerivedEnv" . | nindent 12 }}
+            {{- include "cart-iq.backendDerivedEnv" . | nindent 12 }}
           resources: {{ toYaml .Values.migrate.resources | nindent 12 }}
           securityContext:
-            {{- include "insur-iq.containerSecurityContext" . | nindent 12 }}
+            {{- include "cart-iq.containerSecurityContext" . | nindent 12 }}
           volumeMounts:
             - name: tmp
               mountPath: /tmp

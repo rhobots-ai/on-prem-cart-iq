@@ -1,33 +1,41 @@
 {{- /* Celery worker deployments — one Deployment per queue class. */ -}}
 {{- range $name, $cfg := .Values.celery }}
 {{- if and (kindIs "map" $cfg) (hasKey $cfg "queues") (ne $name "beat") (or (not (hasKey $cfg "enabled")) $cfg.enabled) }}
+{{- /* Per-queue image selection: "scraper" uses the Playwright image, anything else the backend image. */ -}}
+{{- $imageKind := default "backend" $cfg.image -}}
+{{- $image := include "cart-iq.image.backend" $ -}}
+{{- $pullPolicy := $.Values.image.backend.pullPolicy -}}
+{{- if eq $imageKind "scraper" -}}
+{{- $image = include "cart-iq.image.scraper" $ -}}
+{{- $pullPolicy = $.Values.image.scraper.pullPolicy -}}
+{{- end -}}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "insur-iq.fullname" $ }}-celery-{{ kebabcase $name }}
+  name: {{ include "cart-iq.fullname" $ }}-celery-{{ kebabcase $name }}
   labels:
-    {{- include "insur-iq.labels" $ | nindent 4 }}
+    {{- include "cart-iq.labels" $ | nindent 4 }}
     app.kubernetes.io/component: celery-{{ kebabcase $name }}
 spec:
   replicas: {{ $cfg.replicas }}
   revisionHistoryLimit: 3
   selector:
     matchLabels:
-      {{- include "insur-iq.selectorLabels" $ | nindent 6 }}
+      {{- include "cart-iq.selectorLabels" $ | nindent 6 }}
       app.kubernetes.io/component: celery-{{ kebabcase $name }}
   template:
     metadata:
       labels:
-        {{- include "insur-iq.selectorLabels" $ | nindent 8 }}
+        {{- include "cart-iq.selectorLabels" $ | nindent 8 }}
         app.kubernetes.io/component: celery-{{ kebabcase $name }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
         {{- with $.Values.celery.podAnnotations }}{{ toYaml . | nindent 8 }}{{- end }}
     spec:
-      serviceAccountName: {{ include "insur-iq.sa.celery" $ }}
+      serviceAccountName: {{ include "cart-iq.sa.celery" $ }}
       securityContext:
-        {{- include "insur-iq.podSecurityContext" $ | nindent 8 }}
+        {{- include "cart-iq.podSecurityContext" $ | nindent 8 }}
       {{- with $.Values.global.imagePullSecrets }}
       imagePullSecrets: {{ toYaml . | nindent 8 }}
       {{- end }}
@@ -36,8 +44,8 @@ spec:
       {{- end }}
       containers:
         - name: worker
-          image: {{ include "insur-iq.image.backend" $ }}
-          imagePullPolicy: {{ $.Values.image.backend.pullPolicy }}
+          image: {{ $image }}
+          imagePullPolicy: {{ $pullPolicy }}
           command:
             - celery
             - -A
@@ -46,11 +54,20 @@ spec:
             - --loglevel=INFO
             - --queues={{ $cfg.queues }}
             - --concurrency={{ $cfg.concurrency }}
+            {{- with $cfg.pool }}
+            - --pool={{ . }}
+            {{- end }}
             - --hostname={{ kebabcase $name }}@%h
+            {{- range $cfg.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
           envFrom:
-            {{- include "insur-iq.backendEnvFrom" $ | nindent 12 }}
+            {{- include "cart-iq.backendEnvFrom" $ | nindent 12 }}
           env:
-            {{- include "insur-iq.backendDerivedEnv" $ | nindent 12 }}
+            {{- include "cart-iq.backendDerivedEnv" $ | nindent 12 }}
+            {{- range $cfg.extraEnv }}
+            - {{ toYaml . | nindent 14 | trim }}
+            {{- end }}
           livenessProbe:
             exec:
               command: ["sh", "-c", "pgrep -f 'celery.*worker' > /dev/null"]
@@ -60,13 +77,26 @@ spec:
             failureThreshold: 3
           resources: {{ toYaml $cfg.resources | nindent 12 }}
           securityContext:
-            {{- include "insur-iq.containerSecurityContext" $ | nindent 12 }}
+            {{- include "cart-iq.containerSecurityContext" $ | nindent 12 }}
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if $cfg.devShm }}
+            # Chromium maps shared memory under /dev/shm; the container default
+            # (64Mi) crashes tabs. A memory-backed emptyDir gives it real space
+            # while keeping readOnlyRootFilesystem intact.
+            - name: dev-shm
+              mountPath: /dev/shm
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir:
-            sizeLimit: 2Gi
+            sizeLimit: {{ default "2Gi" $cfg.tmpSizeLimit }}
+        {{- if $cfg.devShm }}
+        - name: dev-shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ default "1Gi" $cfg.devShmSizeLimit }}
+        {{- end }}
 {{- end }}
 {{- end }}

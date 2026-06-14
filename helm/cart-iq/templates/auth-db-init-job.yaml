@@ -1,12 +1,16 @@
 {{- if .Values.authDbInit.enabled -}}
-# Ensures the `auth` database exists. Better-Auth handles its own schema migrations on boot.
-# Idempotent — uses CREATE DATABASE IF NOT EXISTS via psql.
+# DB bootstrap (runs before the migrate Job via lower hook-weight):
+#   1. Ensures the `auth` database exists (Better-Auth migrates its own schema on boot).
+#   2. Enables the pgvector extension on the main app DB — cart-iq stores embeddings
+#      in `vector` columns, so the extension must exist before Django migrations run.
+# Idempotent — uses IF-NOT-EXISTS guards. Connects as the RDS master user (DB_USER),
+# which holds rds_superuser and can CREATE DATABASE / CREATE EXTENSION.
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "insur-iq.fullname" . }}-auth-db-init
+  name: {{ include "cart-iq.fullname" . }}-auth-db-init
   labels:
-    {{- include "insur-iq.labels" . | nindent 4 }}
+    {{- include "cart-iq.labels" . | nindent 4 }}
     app.kubernetes.io/component: auth-db-init
   annotations:
     helm.sh/hook: pre-install,pre-upgrade
@@ -14,19 +18,22 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
   backoffLimit: 2
-  activeDeadlineSeconds: 120
+  # Covers the whole pod incl. the waitForSecret init container (up to
+  # preInstallWait.timeoutSeconds, default 120s) plus the auth-DB create and
+  # pgvector CREATE EXTENSION. Keep well above the init-wait budget.
+  activeDeadlineSeconds: 300
   template:
     metadata:
       labels:
-        {{- include "insur-iq.selectorLabels" . | nindent 8 }}
+        {{- include "cart-iq.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: auth-db-init
     spec:
       restartPolicy: Never
-      serviceAccountName: {{ include "insur-iq.sa.celery" . }}
+      serviceAccountName: {{ include "cart-iq.sa.celery" . }}
       securityContext:
-        {{- include "insur-iq.podSecurityContext" . | nindent 8 }}
+        {{- include "cart-iq.podSecurityContext" . | nindent 8 }}
       initContainers:
-        {{- include "insur-iq.waitForSecret" . | nindent 8 }}
+        {{- include "cart-iq.waitForSecret" . | nindent 8 }}
       containers:
         - name: psql
           image: "{{ .Values.authDbInit.image.repository }}:{{ .Values.authDbInit.image.tag }}"
@@ -35,7 +42,7 @@ spec:
             - -c
             - |
               set -e
-              # Idempotent: create only if missing.
+              # 1. Create the auth database if missing (idempotent).
               EXISTS=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME_AUTH'")
               if [ "$EXISTS" != "1" ]; then
                 PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "CREATE DATABASE \"$DB_NAME_AUTH\""
@@ -43,10 +50,14 @@ spec:
               else
                 echo "Database $DB_NAME_AUTH already exists"
               fi
+              # 2. Enable pgvector on the main app DB (idempotent). Required before
+              #    Django migrations create embedding (vector) columns.
+              PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "CREATE EXTENSION IF NOT EXISTS vector"
+              echo "Ensured pgvector extension on $DB_NAME"
           envFrom:
             - secretRef:
-                name: {{ include "insur-iq.secretName.db" . }}
+                name: {{ include "cart-iq.secretName.db" . }}
           resources: {{ toYaml .Values.authDbInit.resources | nindent 12 }}
           securityContext:
-            {{- include "insur-iq.containerSecurityContext" . | nindent 12 }}
+            {{- include "cart-iq.containerSecurityContext" . | nindent 12 }}
 {{- end }}

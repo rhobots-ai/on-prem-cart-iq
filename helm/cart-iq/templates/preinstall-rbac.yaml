@@ -6,9 +6,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "insur-iq.fullname" . }}-preinstall
+  name: {{ include "cart-iq.fullname" . }}-preinstall
   labels:
-    {{- include "insur-iq.labels" . | nindent 4 }}
+    {{- include "cart-iq.labels" . | nindent 4 }}
   annotations:
     helm.sh/hook: pre-install,pre-upgrade
     helm.sh/hook-weight: "0"
@@ -18,14 +18,14 @@ rules:
     resources: ["secrets"]
     verbs: ["get"]
     resourceNames:
-      - {{ include "insur-iq.secretName.db" . }}
+      - {{ include "cart-iq.secretName.db" . }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "insur-iq.fullname" . }}-preinstall
+  name: {{ include "cart-iq.fullname" . }}-preinstall
   labels:
-    {{- include "insur-iq.labels" . | nindent 4 }}
+    {{- include "cart-iq.labels" . | nindent 4 }}
   annotations:
     helm.sh/hook: pre-install,pre-upgrade
     helm.sh/hook-weight: "0"
@@ -33,9 +33,9 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "insur-iq.fullname" . }}-preinstall
+  name: {{ include "cart-iq.fullname" . }}-preinstall
 subjects:
   - kind: ServiceAccount
-    name: {{ include "insur-iq.sa.celery" . }}
+    name: {{ include "cart-iq.sa.celery" . }}
     namespace: {{ .Release.Namespace }}
 {{- end }}

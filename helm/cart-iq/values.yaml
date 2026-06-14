@@ -1,5 +1,5 @@
 # =============================================================================
-# insur-iq Helm chart — default values
+# cart-iq Helm chart — default values
 # =============================================================================
 # This file is the configuration contract. Operators override only the keys
 # they need in a downstream values file (see values.example.yaml).
@@ -15,7 +15,7 @@ global:
   awsAccountId: ""              # e.g. "123456789012"
   awsRegion: ""                 # e.g. "ap-south-1"
   # Public host the app is reachable at. Single host, path-based routing.
-  domain: ""                    # e.g. "insuriq.acmecorp.com"
+  domain: ""                    # e.g. "cartiq.acmecorp.com"
   # Logical environment name; used in labels and SM secret paths.
   env: prod                     # prod | staging | dev
   # Common labels merged into every workload.
@@ -32,12 +32,18 @@ global:
 # -----------------------------------------------------------------------------
 image:
   backend:
-    # If empty, derives to <awsAccountId>.dkr.ecr.<awsRegion>.amazonaws.com/insur-iq/backend
+    # If empty, derives to <awsAccountId>.dkr.ecr.<awsRegion>.amazonaws.com/cart-iq/backend
     repository: ""
     tag: "1.0.0"
     pullPolicy: Always
   web:
-    # If empty, derives to <awsAccountId>.dkr.ecr.<awsRegion>.amazonaws.com/insur-iq/web
+    # If empty, derives to <awsAccountId>.dkr.ecr.<awsRegion>.amazonaws.com/cart-iq/web
+    repository: ""
+    tag: "1.0.0"
+    pullPolicy: Always
+  scraper:
+    # Playwright + Chromium worker image (backend/Dockerfile.scraper).
+    # If empty, derives to <awsAccountId>.dkr.ecr.<awsRegion>.amazonaws.com/cart-iq/scraper
     repository: ""
     tag: "1.0.0"
     pullPolicy: Always
@@ -72,11 +78,11 @@ externalSecrets:
   refreshInterval: 1h
   # AWS Secrets Manager paths. Each must be a JSON-shaped secret.
   remoteRefs:
-    backend: insur-iq/prod/backend   # SECRET_KEY, WEBHOOK_SECRET_KEY
-    db:      insur-iq/prod/db        # DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, DB_NAME_AUTH
-    redis:   insur-iq/prod/redis     # CELERY_BROKER_URL
-    auth:    insur-iq/prod/auth      # BETTER_AUTH_SECRET, OAuth client IDs/secrets
-    llm:     insur-iq/prod/llm       # LLM_PROVIDER, *_API_KEY, *_MODEL, LANGFUSE_*, MINERVA_API_URL
+    backend: cart-iq/prod/backend   # SECRET_KEY, WEBHOOK_SECRET_KEY
+    db:      cart-iq/prod/db        # DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, DB_NAME_AUTH, PARITY_CHAT_DB_*
+    redis:   cart-iq/prod/redis     # CELERY_BROKER_URL
+    auth:    cart-iq/prod/auth      # BETTER_AUTH_SECRET, OAuth client IDs/secrets
+    llm:     cart-iq/prod/llm       # AI_PROVIDER, *_API_KEY, EMBED_*, PARITY_CHAT_MODEL
 
 # Inline secrets — only used when externalSecrets.enabled=false. Values are
 # base64-encoded by the chart. Use ONLY for local kind/dev clusters.
@@ -89,24 +95,32 @@ secrets:
     DB_PORT: "5432"
     DB_USER: ""
     DB_PASSWORD: ""
-    DB_NAME: insure_iq
+    DB_NAME: cart_iq
     DB_NAME_AUTH: auth
+    # Parity-chat read connection. v1 reuses the main user (no read-only role);
+    # blank password inherits DB_PASSWORD in the app.
+    PARITY_CHAT_DB_USER: cart_iq
+    PARITY_CHAT_DB_PASSWORD: ""
   redis:
     CELERY_BROKER_URL: ""
   auth:
     BETTER_AUTH_SECRET: ""
     GOOGLE_CLIENT_ID: ""
     GOOGLE_CLIENT_SECRET: ""
+    GITHUB_CLIENT_ID: ""
+    GITHUB_CLIENT_SECRET: ""
+    MICROSOFT_CLIENT_ID: ""
+    MICROSOFT_CLIENT_SECRET: ""
   llm:
-    LLM_PROVIDER: gemini            # gemini | openai | anthropic
-    GEMINI_API_KEY: ""
-    GEMINI_MODEL: gemini-2.5-flash
+    AI_PROVIDER: google             # google | openai | anthropic | groq | together | ollama
+    GOOGLE_API_KEY: ""
+    EMBED_GOOGLE_API_KEY: ""        # blank → inherits GOOGLE_API_KEY
     OPENAI_API_KEY: ""
-    OPENAI_MODEL: gpt-4o-mini
     ANTHROPIC_API_KEY: ""
-    ANTHROPIC_MODEL: claude-sonnet-4-6
-    LANGFUSE_PUBLIC_KEY: ""
-    LANGFUSE_SECRET_KEY: ""
+    GROQ_API_KEY: ""
+    TOGETHER_API_KEY: ""
+    OLLAMA_API_BASE: ""
+    PARITY_CHAT_MODEL: anthropic/claude-opus-4-7
 
 # -----------------------------------------------------------------------------
 # Non-secret config — rendered into a ConfigMap, mounted via envFrom.
@@ -117,20 +131,35 @@ config:
   AWS_REGION: ""                  # auto-derives from global.awsRegion
   AWS_STORAGE_BUCKET_NAME: ""     # REQUIRED — S3 bucket for uploads
   AWS_S3_ENDPOINT_URL: ""         # blank for real S3
-  AWS_SENDER_EMAIL: ""            # SES verified sender for transactional email; blank disables outbound mail
+  AWS_S3_PUBLIC_ENDPOINT_URL: ""  # default: blank (real S3); set only when fronting MinIO/S3 with a public proxy
+  # NOTE: cart-iq's settings.py currently declares AWS_ACCESS_KEY_ID /
+  # AWS_SECRET_ACCESS_KEY as REQUIRED env vars (no default). This stack uses
+  # EKS Pod Identity (no static keys), so those vars are intentionally NOT set
+  # here — setting them (even empty) would short-circuit boto3's credential
+  # chain and break Pod Identity. The app must default them blank in
+  # config/settings.py (env defaults) for backend/celery to boot. See the
+  # deployment guide's decision log.
   CELERY_RESULT_BACKEND: django-db
   CELERY_CACHE_BACKEND: django-cache
-  EXCEL_AI_CLASSIFICATION_ENABLED: "true"
-  # LLM_PROVIDER and *_MODEL live in the `llm` Secret (insur-iq/<env>/llm),
-  # seeded via scripts/seed-secrets.sh — model choice travels with the API key.
-  LANGFUSE_HOST: https://cloud.langfuse.com
-  MINERVA_API_URL: ""
-  POLICY_EXTRACT_CALLBACK_URL: "" # auto-derives to https://<domain>/service-api/policy-extract/callback/
+  # AI provider/model/keys + embedding config live in the `llm` Secret
+  # (cart-iq/<env>/llm), seeded via scripts/seed-secrets.sh.
+  EMBED_MODEL: gemini-embedding-2
+  EMBED_DIMENSIONS: "1536"
+  GEMINI_USE_VERTEX_AI: "False"
+  EMBED_USE_VERTEX_AI: ""         # blank → inherits GEMINI_USE_VERTEX_AI
+  PARITY_CHAT_CACHE_ENABLED: "False"
+  ANTHROPIC_RATIONALES_ENABLED: "False"
+  # Scraper tunables (Playwright/Flipkart). Defaults match the app; override
+  # only when load-testing or rate-limit tuning. Unset keys fall back to the
+  # app's built-in defaults in config/settings.py.
+  SCRAPER_DEFAULT_PINCODE: "110001"
+  SCRAPER_MAX_CONCURRENCY: "3"    # also feeds celery scraper worker -c
+  SCRAPER_RATE_LIMIT_ENABLED: "True"
+  SCRAPER_LISTING_PARTITION: "True"
   # Auto-derived from global.domain if blank:
   ALLOWED_HOSTS: ""               # default: <domain>
   CSRF_TRUSTED_ORIGINS: ""        # default: https://<domain>
   HOST_NAME: ""                   # default: https://<domain>
-  AWS_S3_PUBLIC_ENDPOINT_URL: ""  # default: blank (real S3); set only when fronting MinIO/S3 with a public proxy
 
 # -----------------------------------------------------------------------------
 # Per-workload sections
@@ -194,6 +223,7 @@ web:
   publicApiScheme: https      # → NUXT_PUBLIC_API_SCHEME
   appBaseUrl: "/"             # → NUXT_APP_BASE_URL (Nuxt subpath; "/" for root deploys)
   enabledSocialProviders: ""  # comma-separated list (e.g. "google,github")
+  scraperDefaultPincode: "110001"  # → NUXT_PUBLIC_SCRAPER_DEFAULT_PINCODE
   livenessProbe:
     httpGet: { path: /, port: 3000 }
     initialDelaySeconds: 15
@@ -255,27 +285,46 @@ celery:
     instrumentation.opentelemetry.io/inject-nodejs: "false"
     instrumentation.opentelemetry.io/inject-java: "false"
     instrumentation.opentelemetry.io/inject-dotnet: "false"
+  # General-purpose worker — consumes the app's default queue ("celery") for
+  # parity/catalogue tasks. Default (prefork) pool, backend image.
   default:
     replicas: 1
     concurrency: 4
-    queues: default
+    queues: celery
     resources:
       requests: { cpu: 200m, memory: 512Mi }
       limits:   { cpu: 1000m, memory: 1Gi }
-  policyExtract:
+  # Browser scraper worker — Playwright/Chromium image, prefork pool (a hung
+  # browser task must be killable by --time-limit), recycles processes to cap
+  # Chromium memory, prefetch=1 to avoid orphaned jobs on restart. Consumes the
+  # dedicated listing queue alongside the product queue so listings aren't
+  # starved behind product children.
+  scraper:
+    image: scraper
+    pool: prefork
+    devShm: true                  # Chromium /dev/shm
+    devShmSizeLimit: 1Gi
+    tmpSizeLimit: 4Gi
     replicas: 1
-    concurrency: 10
-    queues: policy_extract
+    concurrency: 3                # keep in sync with config.SCRAPER_MAX_CONCURRENCY
+    queues: scraper_listing,scraper
+    # Chromium/Playwright needs a writable HOME + cache/config dirs. The image
+    # defaults HOME=/root, which is not writable under readOnlyRootFilesystem +
+    # runAsUser 1000. Point them all at the writable /tmp emptyDir so the browser
+    # can create its singleton/profile/cache.
+    extraEnv:
+      - { name: HOME, value: /tmp }
+      - { name: XDG_CACHE_HOME, value: /tmp/.cache }
+      - { name: XDG_CONFIG_HOME, value: /tmp/.config }
+      - { name: TMPDIR, value: /tmp }
+    extraArgs:
+      - --max-tasks-per-child=20
+      - --prefetch-multiplier=1
+      - --time-limit=700
+      - --soft-time-limit=600
     resources:
       requests: { cpu: 500m, memory: 1Gi }
-      limits:   { cpu: 2000m, memory: 2Gi }
-  commissionIntake:
-    replicas: 1
-    concurrency: 2
-    queues: commission_intake
-    resources:
-      requests: { cpu: 250m, memory: 512Mi }
-      limits:   { cpu: 1000m, memory: 1Gi }
+      limits:   { cpu: 2000m, memory: 3Gi }
   beat:
     enabled: true
     # Singleton — never autoscale, never run >1 replica.
@@ -348,8 +397,7 @@ podDisruptionBudget:
   web:              { enabled: true, minAvailable: 1 }
   auth:             { enabled: true, minAvailable: 1 }
   celeryDefault:    { enabled: true, minAvailable: 1 }
-  policyExtract:    { enabled: true, minAvailable: 1 }
-  commissionIntake: { enabled: false }
+  scraper:          { enabled: true, minAvailable: 1 }
 
 # -----------------------------------------------------------------------------
 # NetworkPolicy — default-deny + tight allow list
@@ -360,7 +408,7 @@ networkPolicy:
   allowedEgress:
     rdsCidrs: []         # e.g. ["10.0.10.0/24", "10.0.11.0/24"] (RDS subnet CIDRs)
     redisCidrs: []       # ElastiCache subnet CIDRs
-    # All HTTPS egress (S3, Secrets Manager, LLM APIs, ECR, Langfuse) goes through 0.0.0.0/0:443.
+    # All HTTPS egress (S3, Secrets Manager, AI provider APIs, ECR, scraper targets) goes through 0.0.0.0/0:443.
 
 # -----------------------------------------------------------------------------
 # Pod security defaults — applied to every workload.
