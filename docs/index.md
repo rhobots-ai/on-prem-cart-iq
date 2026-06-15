@@ -11,6 +11,7 @@ This documentation covers everything a DevOps engineer needs to provision infras
 
 - [EKS Deployment Guide](eks-deployment-guide.md) — end-to-end runbook (Kubernetes)
 - [EC2 Deployment Guide](ec2-deployment-guide.md) — end-to-end runbook (Docker Compose + ALB)
+- [Decision Log](decision-log.md) — architectural rationale (the *why*) for both paths
 - [Infrastructure Overview](infra/terraform.md) — Terraform modules
 - [Resource Requirements](resource-requirements.md) — node sizing and capacity
 
