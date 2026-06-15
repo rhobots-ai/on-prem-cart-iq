@@ -43,6 +43,7 @@ nav:
   - Home: index.md
   - EKS Deployment Guide: eks-deployment-guide.md
   - EC2 Deployment Guide: ec2-deployment-guide.md
+  - Decision Log: decision-log.md
   - Infrastructure:
       - Overview: infra/terraform.md
       - Resource Requirements: resource-requirements.md

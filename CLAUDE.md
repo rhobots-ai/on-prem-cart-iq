@@ -8,9 +8,9 @@ This is **deployment-only**: Terraform + a Helm chart + operator scripts to run 
 
 **Two deployment paths** ship the same images:
 - **EKS (default)** — `infra/terraform/` + `helm/cart-iq/`; runbook [docs/eks-deployment-guide.md](docs/eks-deployment-guide.md). Most of this file describes this path.
-- **EC2 / Docker Compose** — `infra/terraform-ec2/` (ALB + app EC2 + RDS + S3) + `deploy/ec2/` (compose, nginx, `.env` templates); runbook [docs/ec2-deployment-guide.md](docs/ec2-deployment-guide.md). Simpler topology: nginx routes on the app box (not the ALB), Redis is a container (not ElastiCache), DB is direct (no Proxy), secrets are `.env` files (no ESO), identity is one EC2 instance profile (not Pod Identity). Single box — no GPU (cart-iq is API-based; the Playwright scraper runs on the app box CPU). See that guide's Appendix C for the why.
+- **EC2 / Docker Compose** — `infra/terraform-ec2/` (ALB + app EC2 + RDS + S3) + `deploy/ec2/` (compose, nginx, `.env` templates); runbook [docs/ec2-deployment-guide.md](docs/ec2-deployment-guide.md). Simpler topology: nginx routes on the app box (not the ALB), Redis is a container (not ElastiCache), DB is direct (no Proxy), secrets are `.env` files (no ESO), identity is one EC2 instance profile (not Pod Identity). Single box — no GPU (cart-iq is API-based; the Playwright scraper runs on the app box CPU). See [docs/decision-log.md](docs/decision-log.md#ec2-path) for the why.
 
-The canonical end-to-end runbook is [docs/eks-deployment-guide.md](docs/eks-deployment-guide.md). When in doubt about a deployment step, check there before reasoning from first principles — it documents the chosen sequence and the why behind non-obvious decisions (Appendix D — Decision Log).
+The canonical end-to-end runbook is [docs/eks-deployment-guide.md](docs/eks-deployment-guide.md). When in doubt about a deployment step, check there before reasoning from first principles — it documents the chosen sequence; the why behind non-obvious decisions lives in [docs/decision-log.md](docs/decision-log.md).
 
 ## Common commands
 
@@ -85,4 +85,4 @@ Secrets: **External Secrets Operator** projects 5 AWS Secrets Manager paths (`ca
 - [helm/cart-iq/values.yaml](helm/cart-iq/values.yaml) — canonical configuration contract; read this before editing any template.
 - [helm/cart-iq/templates/_helpers.tpl](helm/cart-iq/templates/_helpers.tpl) — domain auto-derivation logic and shared labels.
 - [scripts/seed-secrets.sh](scripts/seed-secrets.sh) — refuses to run if `seed-secrets.env` is git-tracked (a real-leak guard); auto-fetches RDS/Redis values from `terraform output`.
-- [eks-deployment-guide.md](eks-deployment-guide.md) — the runbook. Appendix A is the env var reference, Appendix D is the decision log explaining *why* choices were made.
+- [eks-deployment-guide.md](eks-deployment-guide.md) — the runbook. Appendix A is the env var reference. The decision log explaining *why* choices were made lives in [docs/decision-log.md](docs/decision-log.md).

@@ -29,7 +29,6 @@ Playwright scraper worker runs on the app box CPU alongside the other services.
 13. [Cost Reference](#13-cost-reference)
 14. [Appendix A — Environment Variables](#appendix-a-environment-variables)
 15. [Appendix B — Security Group Rules](#appendix-b-security-group-rules)
-16. [Appendix C — Decision Log](#appendix-c-decision-log)
 
 ---
 
@@ -454,38 +453,3 @@ Authoritative template: [`deploy/ec2/app.env.example`](../deploy/ec2/app.env.exa
 | --- | --- | --- |
 | In | 5432 | App SG only |
 | Out | all | `0.0.0.0/0` |
-
----
-
-## Appendix C — Decision Log
-
-- **Single app box, no GPU** — cart-iq uses API-based inference (Gemini/OpenAI/
-  Anthropic), not self-hosted models, so there is no GPU box. The heavy worker is
-  the Playwright/Chromium scraper, which is CPU-bound and runs on the app box.
-  This matches the EKS path, which deliberately omits a GPU node group.
-- **pgvector enabled in the bootstrap** — cart-iq stores embeddings in `vector`
-  columns; the `authdb` one-shot creates the `auth` DB *and* runs
-  `CREATE EXTENSION IF NOT EXISTS vector` on `cart_iq` before migrations, mirroring
-  the EKS auth-db-init Job.
-- **Auth nginx-sidecar collapsed** — the EKS chart fronts the auth app with an
-  nginx sidecar only because its ALB forwards unstripped `/auth/` paths. On EC2
-  the app-box nginx already strips `/auth/`, so the auth app is reached directly
-  on `:10000` (`PORT=10000`); no sidecar is needed.
-- **gunicorn + discrete migrate/authdb steps** — the compose runs gunicorn as the
-  backend command and Django migrations as a one-shot `migrate` tool, mirroring
-  the EKS chart (gunicorn workload + migrate pre-install Job) rather than an
-  image entrypoint that migrates on boot.
-- **Redis as a container, not ElastiCache** — the broker holds transient queue
-  state only (results live in Postgres); a local container removes a managed
-  service and its cost.
-- **Direct RDS, no Proxy** — a fixed, small set of services opens few
-  connections; RDS Proxy's pooling/failover-muxing buys little here and adds a
-  hop. TLS is still enforced.
-- **`.env` files, not ESO/Secrets Manager projection** — without Kubernetes
-  there is no ESO; instance-local env files are the simplest secure option, with
-  SSM Parameter Store available for stricter governance.
-- **Instance profile, not Pod Identity** — one IAM role on the box (S3 + ECR +
-  SSM) replaces the per-workload Pod Identity roles of the EKS path.
-- **nginx does path routing, not the ALB** — keeps ALB config trivial (one TLS
-  listener → one target group) and mirrors the `/`, `/service-api`, `/auth`
-  split the EKS ingress performs.

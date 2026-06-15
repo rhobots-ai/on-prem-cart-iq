@@ -24,7 +24,6 @@ The deployment is **configuration-driven**. You will edit one Helm values file (
 14. [Appendix A — Environment Variable Reference](#appendix-a--environment-variable-reference)
 15. [Appendix B — IAM Policy JSONs](#appendix-b--iam-policy-jsons)
 16. [Appendix C — CloudWatch Alarms](#appendix-c--cloudwatch-alarms)
-17. [Appendix D — Decision Log](#appendix-d--decision-log)
 
 ---
 
@@ -570,7 +569,7 @@ ingress:
 > does not set them — setting them (even blank) would short-circuit boto3's
 > credential chain and break Pod Identity. The app must default these blank in
 > `settings.py` (`env("AWS_ACCESS_KEY_ID", default="")`) or backend/celery will
-> fail to boot. See [Appendix D](#appendix-d--decision-log).
+> fail to boot. See the [Decision Log](decision-log.md#eks-path).
 
 ### Auto-derived from `global.domain` (don't set unless overriding)
 
@@ -1028,7 +1027,7 @@ Levers:
 | `AWS_STORAGE_BUCKET_NAME` | configmap | yes | — |
 | `AWS_S3_ENDPOINT_URL` | configmap | no | (blank for real S3) |
 | `AWS_S3_PUBLIC_ENDPOINT_URL` | configmap | no | (blank for real S3; set when fronting MinIO) |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | — | no (Pod Identity) | NOT set — see the AWS-credentials note in §7 and Appendix D |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | — | no (Pod Identity) | NOT set — see the AWS-credentials note in §7 and the [Decision Log](decision-log.md#eks-path) |
 | `ALLOWED_HOSTS` | derived | no | `<domain>` |
 | `CSRF_TRUSTED_ORIGINS` | derived | no | `https://<domain>` |
 | `HOST_NAME` | derived | no | `https://<domain>` |
@@ -1242,38 +1241,3 @@ aws cloudwatch put-metric-alarm \
 **Migration backstop:** the chart's `migrate` Job sets release status to `failed` on Helm — so a failed migration aborts the deploy and old pods keep serving. No alarm needed; CI surfaces the failure. If you want belt-and-suspenders, alarm on `kube_job_failed` once you migrate to AMP.
 
 **AI rate-limit / cost and scraper backlog** (queue depth, provider 429s, target-site blocking): these don't have CloudWatch metrics today. If they matter, emit them from Django via `boto3.client('cloudwatch').put_metric_data(...)` and add alarms — that's typically the first reason teams adopt Prometheus instead.
-
----
-
-## Appendix D — Decision Log
-
-| Decision | Choice | Rationale |
-|---|---|---|
-| Ingress | AWS LBC + ALB (single) | ACM-native, WAF/Shield ready, no client body limit, idle timeout up to 4000s |
-| TLS | ACM regional cert | Free, auto-renewed, attached to ALB |
-| Host topology | Single host, path-based | Preserves Better-Auth same-origin cookies; matches app contract |
-| Backend probe path | `/api/health/` | Container-native; `/service-api` prefix only exists at ALB |
-| Static files | `collectstatic` baked into image (WhiteNoise) | No S3 writes at build; simplest |
-| Migrations | Helm pre-install/pre-upgrade Job | Runs once per release; failure aborts rollout |
-| Auth DB | Separate `auth` DB on same RDS instance | Cheaper than two instances; isolation via DB grants |
-| DB pooling | RDS Proxy in front of single instance | Multiplexes Django + celery; smooths failover |
-| Celery autoscaling | None — fixed `replicas` per queue | Simplest possible; I/O-bound workers make CPU HPA ineffective. Resize via `helm upgrade` when a queue is consistently backlogged |
-| Backend autoscaling | HPA on CPU @70% | CPU-bound for synchronous request handling |
-| Beat | Deployment replicas=1, Recreate | Singleton enforced by strategy + alert |
-| Identity | EKS Pod Identity (not IRSA) | Simpler than OIDC trust dance; AWS recommended for new clusters |
-| Secrets | AWS Secrets Manager + ESO | Centralized rotation + audit; no plaintext in Git |
-| Cluster auth | EKS access entries | Replaces aws-auth ConfigMap |
-| CNI | VPC CNI prefix delegation | Avoids pod IP exhaustion on dense nodes |
-| Nodes | Fixed-size managed node groups (system + app) | Simpler ops; predictable cost; resize manually when capacity-bound |
-| GitOps | Argo CD pull-based | No long-lived kubeconfig in CI; rollback via git revert |
-| Image registry | ECR + pull-through cache | No Docker Hub rate limits; immutable tags |
-| Logs | AWS for Fluent Bit → CloudWatch | Single add-on, 30d retention prod |
-| Metrics | CloudWatch Container Insights (EKS addon) | Zero pods on cluster, AWS-native; AMP/AMG or self-hosted Prometheus is future work when custom app metrics are needed |
-| Backups | RDS automated 7d + manual pre-upgrade | Plus Helm history for app rollback |
-| Security baseline | PSA `restricted`, NetworkPolicy default-deny | Defense in depth with minimum operational drag |
-| Celery queues (cart-iq retarget) | `default` (queue `celery`) + `scraper` (`scraper_listing,scraper`) + `beat` | Mirrors the app's `CELERY_TASK_ROUTES`; replaced the old insurance queues (`policy_extract`, `commission_intake`) |
-| Scraper worker | Separate `cart-iq/scraper` image (Playwright/Chromium), **prefork** pool, `--max-tasks-per-child=20`, `--prefetch-multiplier=1`, writable `/dev/shm` | A hung browser task must be killable by `--time-limit` (threads can't); recycle caps Chromium memory; `/dev/shm` emptyDir keeps `readOnlyRootFilesystem` intact |
-| pgvector | Enabled on `cart_iq` by the db-init Job (before migrate) | cart-iq stores embeddings in `vector` columns; the extension must exist before Django migrations |
-| Parity-chat DB role | v1 reuses the main `cart_iq` user (`PARITY_CHAT_DB_USER=cart_iq`) | Avoids provisioning a separate read-only role for the first cut; harden later by creating `chat_readonly` |
-| GPU node group | Removed | cart-iq uses API-based embeddings/inference; no self-hosted local models. Re-add only for ollama/local inference |
-| AWS credentials | Pod Identity only; AWS keys NOT set | `settings.py` declares `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` as required — the app must default them blank, else setting them would break boto3's Pod Identity credential chain |
