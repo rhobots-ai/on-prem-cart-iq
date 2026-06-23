@@ -1,0 +1,1848 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Deployment guides for running cart-iq on a customer-managed AWS account (EKS or EC2)">
+      
+      
+      
+      
+        <link rel="prev" href="../eks-deployment-guide/">
+      
+      
+        <link rel="next" href="../decision-log/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>EC2 Deployment Guide - cart-iq Deployment Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#cart-iq-aws-ec2-load-balancer-deployment-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="cart-iq Deployment Docs" class="md-header__button md-logo" aria-label="cart-iq Deployment Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            cart-iq Deployment Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              EC2 Deployment Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/rhobots-ai/on-prem-cart-iq" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    rhobots-ai/on-prem-cart-iq
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../eks-deployment-guide/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  EKS Deployment Guide
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  EC2 Deployment Guide
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../decision-log/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Decision Log
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../infra/terraform/" class="md-tabs__link">
+          
+  
+  
+  Infrastructure
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="cart-iq Deployment Docs" class="md-nav__button md-logo" aria-label="cart-iq Deployment Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    cart-iq Deployment Docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/rhobots-ai/on-prem-cart-iq" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    rhobots-ai/on-prem-cart-iq
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../eks-deployment-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    EKS Deployment Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    EC2 Deployment Guide
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    EC2 Deployment Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-overview-ec2-vs-eks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Overview — EC2 vs EKS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-resource-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Resource Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Resource Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-app-ec2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 App EC2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-rds-postgresql-16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 RDS — PostgreSQL 16
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-s3-redis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 S3 &amp; Redis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-security-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Security Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-pre-requisite-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Pre-requisite Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-provision-infra-terraform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Provision Infra (Terraform)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-dns-acm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. DNS &amp; ACM
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-configure-the-instance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Configure the Instance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-bring-up-the-stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Bring Up the Stack
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-upgrades-rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Upgrades &amp; Rollback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-failover-availability-day-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Failover, Availability &amp; Day-2
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-cost-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Cost Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appendix-a-environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Appendix A — Environment Variables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appendix-b-security-group-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Appendix B — Security Group Rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../decision-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision Log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Infrastructure
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../infra/terraform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resource-requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resource Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-overview-ec2-vs-eks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Overview — EC2 vs EKS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-resource-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Resource Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Resource Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-app-ec2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 App EC2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-rds-postgresql-16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 RDS — PostgreSQL 16
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-s3-redis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 S3 &amp; Redis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-security-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Security Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-pre-requisite-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Pre-requisite Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-provision-infra-terraform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Provision Infra (Terraform)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-dns-acm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. DNS &amp; ACM
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-configure-the-instance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Configure the Instance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-bring-up-the-stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Bring Up the Stack
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-upgrades-rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Upgrades &amp; Rollback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-failover-availability-day-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Failover, Availability &amp; Day-2
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-cost-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Cost Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appendix-a-environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Appendix A — Environment Variables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appendix-b-security-group-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Appendix B — Security Group Rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="cart-iq-aws-ec2-load-balancer-deployment-guide">cart-iq — AWS EC2 + Load Balancer Deployment Guide<a class="headerlink" href="#cart-iq-aws-ec2-load-balancer-deployment-guide" title="Permanent link">&para;</a></h1>
+<p>This guide covers the <strong>EC2 / Docker Compose</strong> deployment path — a simpler
+alternative to the <a href="../eks-deployment-guide/">EKS path</a> for customers who do not
+run Kubernetes. It is both an <strong>architecture reference</strong> and an <strong>operator
+runbook</strong>: read §1–§4 to understand what gets built and why, then follow §5–§12
+to stand it up.</p>
+<p>The whole stack runs on a <strong>single app box</strong> behind an ALB. cart-iq uses
+API-based inference (no self-hosted models), so there is no GPU box — the
+Playwright scraper worker runs on the app box CPU alongside the other services.</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#1-overview-ec2-vs-eks">Overview — EC2 vs EKS</a></li>
+<li><a href="#2-architecture">Architecture</a></li>
+<li><a href="#3-resource-configuration">Resource Configuration</a></li>
+<li><a href="#4-security-architecture">Security Architecture</a></li>
+<li><a href="#5-pre-requisite-checklist">Pre-requisite Checklist</a></li>
+<li><a href="#6-provision-infra-terraform">Provision Infra (Terraform)</a></li>
+<li><a href="#7-dns-acm">DNS &amp; ACM</a></li>
+<li><a href="#8-configure-the-instance">Configure the Instance</a></li>
+<li><a href="#9-bring-up-the-stack">Bring Up the Stack</a></li>
+<li><a href="#10-verification">Verification</a></li>
+<li><a href="#11-upgrades-rollback">Upgrades &amp; Rollback</a></li>
+<li><a href="#12-failover-availability-day-2">Failover, Availability &amp; Day-2</a></li>
+<li><a href="#13-cost-reference">Cost Reference</a></li>
+<li><a href="#appendix-a-environment-variables">Appendix A — Environment Variables</a></li>
+<li><a href="#appendix-b-security-group-rules">Appendix B — Security Group Rules</a></li>
+</ol>
+<hr />
+<h2 id="1-overview-ec2-vs-eks">1. Overview — EC2 vs EKS<a class="headerlink" href="#1-overview-ec2-vs-eks" title="Permanent link">&para;</a></h2>
+<p>Both paths run the identical container images (<code>backend</code>, <code>web</code>, <code>scraper</code>,
+<code>auth</code>) and the same data plane shape (Postgres + Redis + S3). They differ only
+in the runtime.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><strong>EC2 (this guide)</strong></th>
+<th><strong>EKS</strong> (<a href="../eks-deployment-guide/">guide</a>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Orchestration</td>
+<td>Docker Compose on 1 EC2 box</td>
+<td>Kubernetes (Helm chart)</td>
+</tr>
+<tr>
+<td>Routing</td>
+<td>nginx on the app box, behind an ALB</td>
+<td>ALB Ingress (LBC)</td>
+</tr>
+<tr>
+<td>Redis</td>
+<td>container on the app box</td>
+<td>ElastiCache</td>
+</tr>
+<tr>
+<td>DB access</td>
+<td>direct to RDS (TLS)</td>
+<td>RDS Proxy</td>
+</tr>
+<tr>
+<td>Secrets</td>
+<td><code>.env</code> files on the instance</td>
+<td>External Secrets Operator + Secrets Manager</td>
+</tr>
+<tr>
+<td>Identity</td>
+<td>one EC2 instance profile</td>
+<td>EKS Pod Identity (per-workload roles)</td>
+</tr>
+<tr>
+<td>Scaling</td>
+<td>vertical (resize the box)</td>
+<td>HPA + Cluster Autoscaler</td>
+</tr>
+<tr>
+<td>Best for</td>
+<td>single-tenant, low-ops, "looks like on-prem"</td>
+<td>multi-tenant, elastic, HA</td>
+</tr>
+</tbody>
+</table>
+<p>Choose EC2 when the customer wants the smallest possible operational surface and
+does not need horizontal autoscaling or multi-AZ compute. Choose EKS for
+elasticity and high availability.</p>
+<hr />
+<h2 id="2-architecture">2. Architecture<a class="headerlink" href="#2-architecture" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>                         Internet
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                            │
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                            ▼
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>                 ┌──────────────────────┐
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                 │   Route 53 ALIAS      │
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                 │ cartiq.acmecorp.com   │
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                 └──────────┬───────────┘
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                            ▼
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>                 ┌──────────────────────┐
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>                 │    ALB + ACM cert    │  TLS terminates here; idle_timeout=300s
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>                 │   :443 → app box :80 │
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>                 └──────────┬───────────┘
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>                            ▼  HTTP :80
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>   ┌──── App EC2 (private subnet) — Docker Compose ──────────────────┐
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>   │  nginx  /→web  /service-api→backend  /auth→auth                 │
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>   │  ┌──────┐   ┌──────────┐   ┌──────┐                             │
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>   │  │ web  │   │ backend  │   │ auth │                             │
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>   │  │ Nuxt │   │ Django   │   │Better│                             │
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>   │  │ :3000│   │ :8000    │   │ :10000                             │
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>   │  └──────┘   └────┬─────┘   └──────┘                             │
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>   │  celery: default · scraper (Playwright/Chromium) · beat         │
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>   │  redis (broker, container)                                      │
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>   └────────┬────────────────────────────────────────────────┬──────┘
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>            │ :5432 (TLS)                                      │
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>            ▼                                                  ▼
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>   ┌──────────────────┐                              ┌────────────┐
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>   │ RDS Postgres 16  │                              │ S3 bucket  │
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>   │  cart_iq         │                              │ uploads    │
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>   │  auth            │                              └────────────┘
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>   └──────────────────┘
+</code></pre></div>
+<p><strong>Request flow:</strong> ALB terminates TLS and forwards HTTP to nginx on the app box.
+nginx routes by path. The <strong>scraper</strong> celery worker drives Playwright/Chromium to
+collect listings/products and writes to RDS; the <strong>default</strong> worker handles
+parity/catalogue tasks and the parity-chat pipeline, calling the <strong>LLM</strong> (Gemini
+by default) via API. Uploads and artefacts live in S3, reached via the instance
+profile.</p>
+<p><strong>Services on the app box (<code>docker-compose.app.yml</code>):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>nginx</td>
+<td>Reverse proxy / path routing</td>
+</tr>
+<tr>
+<td>web</td>
+<td>Nuxt SSR dashboard (:3000)</td>
+</tr>
+<tr>
+<td>backend</td>
+<td>Django + gunicorn REST API (:8000)</td>
+</tr>
+<tr>
+<td>auth</td>
+<td>Better Auth — JWT issuance &amp; sessions (:10000)</td>
+</tr>
+<tr>
+<td>celery_default</td>
+<td>General background tasks (queue <code>celery</code>)</td>
+</tr>
+<tr>
+<td>celery_scraper</td>
+<td>Playwright/Chromium scraper (queues <code>scraper_listing,scraper</code>)</td>
+</tr>
+<tr>
+<td>beat</td>
+<td>Scheduled task runner (singleton)</td>
+</tr>
+<tr>
+<td>redis</td>
+<td>Celery broker (container)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-resource-configuration">3. Resource Configuration<a class="headerlink" href="#3-resource-configuration" title="Permanent link">&para;</a></h2>
+<h3 id="31-app-ec2">3.1 App EC2<a class="headerlink" href="#31-app-ec2" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Instance type</td>
+<td><code>m6i.xlarge</code> (4 vCPU / 16 GB) — no GPU</td>
+</tr>
+<tr>
+<td>Root volume</td>
+<td>100 GB gp3, encrypted</td>
+</tr>
+<tr>
+<td>OS</td>
+<td>Ubuntu 24.04 LTS (Noble)</td>
+</tr>
+<tr>
+<td>Runs</td>
+<td>nginx, web, backend, auth, celery (default/scraper/beat), redis</td>
+</tr>
+</tbody>
+</table>
+<p>The scraper worker runs headless Chromium via Playwright. It needs writable
+<code>HOME</code>/cache dirs (pointed at <code>/tmp</code>) and a larger <code>/dev/shm</code> (<code>shm_size: 1gb</code>)
+so Chromium tabs don't crash — both are configured in <code>docker-compose.app.yml</code>.
+If listing volume grows, raise the scraper <code>--concurrency</code> (keep it in sync with
+<code>SCRAPER_MAX_CONCURRENCY</code>) or resize the box.</p>
+<h3 id="32-rds-postgresql-16">3.2 RDS — PostgreSQL 16<a class="headerlink" href="#32-rds-postgresql-16" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Engine</td>
+<td>PostgreSQL <strong>16</strong> (the repo standard)</td>
+</tr>
+<tr>
+<td>Instance</td>
+<td><code>db.t4g.medium</code> (configurable), 100 GB gp3, encrypted</td>
+</tr>
+<tr>
+<td>Availability</td>
+<td>Single-AZ (set <code>rds_multi_az=true</code> for HA)</td>
+</tr>
+<tr>
+<td>Backups</td>
+<td>Daily, 7-day retention; PITR enabled</td>
+</tr>
+<tr>
+<td>TLS</td>
+<td>Enforced (<code>rds.force_ssl=1</code>)</td>
+</tr>
+<tr>
+<td>Logical DBs</td>
+<td><code>cart_iq</code> (app) · <code>auth</code> (Better Auth)</td>
+</tr>
+<tr>
+<td>Extensions</td>
+<td><code>pgvector</code> on <code>cart_iq</code> (embeddings) — created by the <code>authdb</code> bootstrap</td>
+</tr>
+</tbody>
+</table>
+<p>No RDS Proxy — the fixed set of services opens few connections and connects
+directly over TLS.</p>
+<h3 id="33-s3-redis">3.3 S3 &amp; Redis<a class="headerlink" href="#33-s3-redis" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>S3</strong>: one bucket <code>cart-iq-&lt;env&gt;-ec2-uploads</code>, SSE-S3, reached via the VPC
+  gateway endpoint (no NAT egress cost).</li>
+<li><strong>Redis</strong>: a container on the app box, broker only — task results persist in
+  Postgres (<code>CELERY_RESULT_BACKEND=django-db</code>). No ElastiCache.</li>
+</ul>
+<hr />
+<h2 id="4-security-architecture">4. Security Architecture<a class="headerlink" href="#4-security-architecture" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Identity &amp; access</strong> — Users authenticate via Better Auth (email/password,
+  JWT, short-lived tokens). One <strong>EC2 instance profile</strong> grants the box S3
+  access, ECR pull, and SSM Session Manager. No long-lived AWS keys on disk —
+  <code>AWS_ACCESS_KEY_ID</code>/<code>SECRET</code> are intentionally unset so boto3 uses the
+  instance-profile credentials.</li>
+<li><strong>Network isolation</strong> — The EC2 box lives in a <strong>private subnet</strong>. Only the
+  ALB is public. Security groups are least-privilege:</li>
+<li>ALB ← internet on 80/443</li>
+<li>app ← ALB on 80 only</li>
+<li>RDS ← app on 5432 only</li>
+<li><strong>TLS coverage</strong></li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Connection</th>
+<th>Protocol</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>User → ALB</td>
+<td>HTTPS / TLS 1.2+ (TLS13 policy)</td>
+</tr>
+<tr>
+<td>ALB → nginx (app box)</td>
+<td>HTTP, inside the VPC</td>
+</tr>
+<tr>
+<td>app box → RDS</td>
+<td>TLS (enforced)</td>
+</tr>
+<tr>
+<td>app box → LLM API / scraper targets</td>
+<td>HTTPS (outbound only)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Secrets</strong> — config lives in <code>app.env</code> on the instance (gitignored), not in
+  source. For tighter governance you can store the same values in <strong>SSM
+  Parameter Store</strong> (SecureString) and render <code>app.env</code> at boot — optional, not
+  required.</li>
+</ul>
+<p>Full SG matrix in <a href="#appendix-b-security-group-rules">Appendix B</a>.</p>
+<hr />
+<h2 id="5-pre-requisite-checklist">5. Pre-requisite Checklist<a class="headerlink" href="#5-pre-requisite-checklist" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>AWS account + credentials (<code>aws sts get-caller-identity</code> works)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Terraform ≥ 1.6, AWS CLI v2 installed locally</td>
+</tr>
+<tr>
+<td>3</td>
+<td>A registered domain + Route53 hosted zone (or external DNS you control)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>ECR repos exist: <code>cart-iq/backend</code>, <code>cart-iq/web</code>, <code>cart-iq/scraper</code> (managed outside Terraform — they outlive any environment)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Image tags pushed to ECR by CI</td>
+</tr>
+<tr>
+<td>6</td>
+<td>OAuth / LLM (Gemini) API keys on hand for the <code>.env</code> file</td>
+</tr>
+</tbody>
+</table>
+<p>Set shell vars once per terminal:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">AWS_REGION</span><span class="o">=</span>ap-south-1
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">DOMAIN</span><span class="o">=</span>cartiq.acmecorp.com
+</code></pre></div>
+<hr />
+<h2 id="6-provision-infra-terraform">6. Provision Infra (Terraform)<a class="headerlink" href="#6-provision-infra-terraform" title="Permanent link">&para;</a></h2>
+<p>The EC2 path has its <strong>own Terraform root</strong>: <code>infra/terraform-ec2/</code> (separate
+from the EKS <code>infra/terraform/</code>). Use one or the other per environment.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">cd</span><span class="w"> </span>infra/terraform-ec2
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>terraform<span class="w"> </span>init
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>terraform<span class="w"> </span>plan<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>-var<span class="w"> </span><span class="s2">&quot;domain=</span><span class="nv">$DOMAIN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span>-var<span class="w"> </span><span class="s2">&quot;region=</span><span class="nv">$AWS_REGION</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span>-out<span class="w"> </span>tfplan
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>terraform<span class="w"> </span>apply<span class="w"> </span>tfplan
+</code></pre></div>
+<p>This provisions: VPC (3 AZ, public/private/db subnets, single NAT, S3 gateway
+endpoint), the ALB + target group + listeners, the app EC2 instance (with Docker
+bootstrapped via cloud-init), the instance profile, RDS Postgres 16, the S3
+bucket, and the ACM cert.</p>
+<p>Key outputs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>terraform<span class="w"> </span>output<span class="w"> </span>alb_dns_name<span class="w">        </span><span class="c1"># point DNS here if not using Route53</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>terraform<span class="w"> </span>output<span class="w"> </span>app_private_ip
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>terraform<span class="w"> </span>output<span class="w"> </span>rds_master_secret_arn
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>terraform<span class="w"> </span>output<span class="w"> </span>-raw<span class="w"> </span>app_env_snippet<span class="w"> </span>&gt;<span class="w"> </span>../../deploy/ec2/app.env
+</code></pre></div>
+<hr />
+<h2 id="7-dns-acm">7. DNS &amp; ACM<a class="headerlink" href="#7-dns-acm" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>ACM</strong>: if you did not pass <code>acm_certificate_arn</code>, Terraform requested a new
+  DNS-validated cert. Create the validation CNAME shown in the ACM console (or
+  via <code>aws acm describe-certificate</code>) and wait for status <strong>ISSUED</strong>.</li>
+<li><strong>DNS</strong>: if you passed <code>route53_zone_id</code>, Terraform already created the ALIAS
+  A-record. Otherwise create a CNAME/ALIAS for <code>$DOMAIN</code> → <code>alb_dns_name</code> in
+  your provider.</li>
+</ul>
+<hr />
+<h2 id="8-configure-the-instance">8. Configure the Instance<a class="headerlink" href="#8-configure-the-instance" title="Permanent link">&para;</a></h2>
+<p>Connect to the app box via SSM Session Manager (no SSH, no bastion):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>aws<span class="w"> </span>ssm<span class="w"> </span>start-session<span class="w"> </span>--target<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>terraform<span class="w"> </span>output<span class="w"> </span>-raw<span class="w"> </span>app_instance_id<span class="k">)</span><span class="s2">&quot;</span>
+</code></pre></div>
+<p>On the app box:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Copy deploy/ec2/ to the box (scp via SSM tunnel, git clone, or S3).</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">cd</span><span class="w"> </span>/opt/cart-iq/deploy/ec2
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Fill app.env (start from the Terraform snippet, then add secrets).</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>cp<span class="w"> </span>app.env.example<span class="w"> </span>app.env<span class="w">   </span><span class="c1"># or use the app_env_snippet output</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="nv">$EDITOR</span><span class="w"> </span>app.env<span class="w">              </span><span class="c1"># fill DB_PASSWORD (from rds_master_secret_arn), SECRET_KEY,</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">                             </span><span class="c1"># WEBHOOK_SECRET_KEY, BETTER_AUTH_SECRET, GOOGLE_API_KEY</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1"># Log Docker in to ECR.</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="nb">source</span><span class="w"> </span>app.env
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>aws<span class="w"> </span>ecr<span class="w"> </span>get-login-password<span class="w"> </span>--region<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$AWS_REGION</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>docker<span class="w"> </span>login<span class="w"> </span>--username<span class="w"> </span>AWS<span class="w"> </span>--password-stdin<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$ECR_REGISTRY</span><span class="s2">&quot;</span>
+</code></pre></div>
+<p>Fetch the DB password from the RDS master secret:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>aws<span class="w"> </span>secretsmanager<span class="w"> </span>get-secret-value<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>--secret-id<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>terraform<span class="w"> </span>output<span class="w"> </span>-raw<span class="w"> </span>rds_master_secret_arn<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>--query<span class="w"> </span>SecretString<span class="w"> </span>--output<span class="w"> </span>text<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span>.password
+</code></pre></div>
+<hr />
+<h2 id="9-bring-up-the-stack">9. Bring Up the Stack<a class="headerlink" href="#9-bring-up-the-stack" title="Permanent link">&para;</a></h2>
+<p>First confirm RDS is reachable — a fresh instance can take 5–10 minutes to leave
+<code>creating</code> after <code>terraform apply</code> returns. Wait for status <code>available</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>aws<span class="w"> </span>rds<span class="w"> </span>describe-db-instances<span class="w"> </span>--db-instance-identifier<span class="w"> </span>cart-iq-<span class="si">${</span><span class="nv">ENV</span><span class="k">:-</span><span class="nv">prod</span><span class="si">}</span>-ec2<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--query<span class="w"> </span><span class="s1">&#39;DBInstances[0].DBInstanceStatus&#39;</span><span class="w"> </span>--output<span class="w"> </span>text
+</code></pre></div>
+<p>Run the two one-shot bootstrap tools once (they live behind the <code>tools</code> compose
+profile, so they are not part of <code>up -d</code>), then start the long-running services:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># 1. Ensure the `auth` logical DB exists and pgvector is enabled on cart_iq.</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.app.yml<span class="w"> </span>--env-file<span class="w"> </span>app.env<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>authdb
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># 2. Run Django migrations against the app DB.</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.app.yml<span class="w"> </span>--env-file<span class="w"> </span>app.env<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>migrate
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># 3. Start the stack.</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.app.yml<span class="w"> </span>--env-file<span class="w"> </span>app.env<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<p><code>pgvector</code> must exist before migrations — cart-iq stores embeddings in <code>vector</code>
+columns (the <code>authdb</code> tool enables it, mirroring the EKS auth-db-init Job).
+Better Auth runs its own schema migrations on first boot against the <code>auth</code> DB.</p>
+<blockquote>
+<p><strong>Web <code>NUXT_PUBLIC_*</code> URLs are passed at runtime</strong> in <code>docker-compose.app.yml</code>
+(derived from <code>DOMAIN</code>): <code>NUXT_PUBLIC_API_BASE_URL=&lt;domain&gt;/service-api</code>,
+<code>NUXT_PUBLIC_AUTH_BASE_URL=https://&lt;domain&gt;/auth/api/auth</code>,
+<code>NUXT_PUBLIC_APP_BASE_URL=https://&lt;domain&gt;</code>, <code>NUXT_PUBLIC_API_SCHEME=https</code>.</p>
+<p><strong>No <code>SCRIPT_NAME</code>.</strong> The app-box nginx strips the <code>/service-api</code> and <code>/auth</code>
+prefixes (trailing-slash <code>proxy_pass</code>), so the backend serves bare <code>/api/...</code>
+paths. The EKS chart sets <code>SCRIPT_NAME=/service-api</code> because its ALB does not
+strip; do not set it here. This is also why the EKS auth nginx-sidecar is
+unnecessary on EC2 — the app-box nginx already does the prefix strip.</p>
+</blockquote>
+<hr />
+<h2 id="10-verification">10. Verification<a class="headerlink" href="#10-verification" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span>-fsS<span class="w"> </span>https://<span class="nv">$DOMAIN</span>/service-api/api/health/
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>curl<span class="w"> </span>-fsS<span class="w"> </span>https://<span class="nv">$DOMAIN</span>/auth/api/auth/ok
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>curl<span class="w"> </span>-fsS<span class="w"> </span>https://<span class="nv">$DOMAIN</span>/<span class="w"> </span>-o<span class="w"> </span>/dev/null
+</code></pre></div>
+<p>All three returning 2xx means the deploy is live. Also confirm the ALB target is
+healthy:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>aws<span class="w"> </span>elbv2<span class="w"> </span>describe-target-health<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span>--target-group-arn<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>aws<span class="w"> </span>elbv2<span class="w"> </span>describe-target-groups<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">      </span>--names<span class="w"> </span>cart-iq-<span class="si">${</span><span class="nv">ENV</span><span class="k">:-</span><span class="nv">prod</span><span class="si">}</span>-app<span class="w"> </span>--query<span class="w"> </span><span class="s1">&#39;TargetGroups[0].TargetGroupArn&#39;</span><span class="w"> </span>--output<span class="w"> </span>text<span class="k">)</span><span class="s2">&quot;</span>
+</code></pre></div>
+<p>The target-group health check hits <code>/healthz</code> (answered directly by nginx).</p>
+<hr />
+<h2 id="11-upgrades-rollback">11. Upgrades &amp; Rollback<a class="headerlink" href="#11-upgrades-rollback" title="Permanent link">&para;</a></h2>
+<p>Roll a new image tag:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># On the app box — bump the tag in app.env, then:</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nb">source</span><span class="w"> </span>app.env
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>aws<span class="w"> </span>ecr<span class="w"> </span>get-login-password<span class="w"> </span>--region<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$AWS_REGION</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>docker<span class="w"> </span>login<span class="w"> </span>--username<span class="w"> </span>AWS<span class="w"> </span>--password-stdin<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$ECR_REGISTRY</span><span class="s2">&quot;</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.app.yml<span class="w"> </span>--env-file<span class="w"> </span>app.env<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>migrate<span class="w">   </span><span class="c1"># if the release has migrations</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.app.yml<span class="w"> </span>--env-file<span class="w"> </span>app.env<span class="w"> </span>pull
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.app.yml<span class="w"> </span>--env-file<span class="w"> </span>app.env<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<p><strong>Rollback</strong>: set the previous tag in <code>app.env</code> and re-run <code>pull</code> + <code>up -d</code>.
+Compose recreates only the changed services. For a full-box failure, replace the
+instance from its AMI — no DNS, IAM, or SG changes are needed (the ALB
+re-registers the new instance once it is healthy).</p>
+<hr />
+<h2 id="12-failover-availability-day-2">12. Failover, Availability &amp; Day-2<a class="headerlink" href="#12-failover-availability-day-2" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Mechanism</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>App health</td>
+<td>ALB health check on <code>/healthz</code>; unhealthy targets are drained</td>
+</tr>
+<tr>
+<td>Compute recovery</td>
+<td>Replace EC2 from an AMI; re-attach to the target group</td>
+</tr>
+<tr>
+<td>Database recovery</td>
+<td>Daily RDS snapshots + PITR (<code>rds_multi_az=true</code> for AZ failover)</td>
+</tr>
+<tr>
+<td>In-flight tasks</td>
+<td>Fail safely; completed results persist in RDS + S3</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Day-2 runbooks:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Logs</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.app.yml<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>backend
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.app.yml<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>celery_scraper
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="c1"># Restart a service</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.app.yml<span class="w"> </span>--env-file<span class="w"> </span>app.env<span class="w"> </span>restart<span class="w"> </span>backend
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="c1"># Scale scraper throughput — raise celery_scraper --concurrency (keep</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="c1"># SCRAPER_MAX_CONCURRENCY in sync) or resize the app box (vertical). No HPA here.</span>
+</code></pre></div>
+<hr />
+<h2 id="13-cost-reference">13. Cost Reference<a class="headerlink" href="#13-cost-reference" title="Permanent link">&para;</a></h2>
+<p>Indicative on-demand monthly cost (ap-south-1, 730 h; excludes data transfer &amp;
+LLM API usage):</p>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Spec</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>App EC2</td>
+<td>m6i.xlarge</td>
+<td>Always-on</td>
+</tr>
+<tr>
+<td>RDS</td>
+<td>db.t4g.medium, 100 GB gp3</td>
+<td>Single-AZ; ~2× for Multi-AZ</td>
+</tr>
+<tr>
+<td>ALB</td>
+<td>1 ALB</td>
+<td>+ LCU usage</td>
+</tr>
+<tr>
+<td>S3</td>
+<td>Standard</td>
+<td>Usage-based</td>
+</tr>
+<tr>
+<td>NAT Gateway</td>
+<td>single</td>
+<td>Hourly + per-GB</td>
+</tr>
+</tbody>
+</table>
+<p>The single always-on app box plus RDS dominate. LLM usage is billed per-call by
+the provider (Gemini/OpenAI/Anthropic) and is not an infra line item.</p>
+<hr />
+<h2 id="appendix-a-environment-variables">Appendix A — Environment Variables<a class="headerlink" href="#appendix-a-environment-variables" title="Permanent link">&para;</a></h2>
+<p>Authoritative template: <a href="../deploy/ec2/app.env.example"><code>deploy/ec2/app.env.example</code></a>.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ECR_REGISTRY</code>, <code>*_TAG</code></td>
+<td>Image registry + per-image tags (<code>BACKEND_TAG</code>, <code>WEB_TAG</code>, <code>SCRAPER_TAG</code>, <code>AUTH_TAG</code>)</td>
+</tr>
+<tr>
+<td><code>DOMAIN</code></td>
+<td>Public FQDN; drives derived URLs</td>
+</tr>
+<tr>
+<td><code>ALLOWED_HOSTS</code>, <code>CSRF_TRUSTED_ORIGINS</code>, <code>HOST_NAME</code></td>
+<td>Django host/origin allow-lists (include <code>localhost,127.0.0.1,backend</code> for the healthcheck)</td>
+</tr>
+<tr>
+<td><code>SECRET_KEY</code>, <code>WEBHOOK_SECRET_KEY</code></td>
+<td>Django secrets</td>
+</tr>
+<tr>
+<td><code>DB_HOST/PORT/USER/PASSWORD/NAME</code></td>
+<td>RDS connection (<code>DB_NAME_AUTH</code> = <code>auth</code>); <code>PARITY_CHAT_DB_*</code> for the parity-chat read connection</td>
+</tr>
+<tr>
+<td><code>CELERY_BROKER_URL</code></td>
+<td><code>redis://redis:6379/0</code> (local container); results in Postgres</td>
+</tr>
+<tr>
+<td><code>AWS_REGION</code>, <code>AWS_STORAGE_BUCKET_NAME</code></td>
+<td>S3 uploads (credentials come from the instance profile)</td>
+</tr>
+<tr>
+<td><code>EMBED_MODEL</code>, <code>EMBED_DIMENSIONS</code>, <code>GEMINI_USE_VERTEX_AI</code>, <code>EMBED_USE_VERTEX_AI</code>, <code>PARITY_CHAT_*</code></td>
+<td>Embedding + parity-chat tuning</td>
+</tr>
+<tr>
+<td><code>GOOGLE_CLOUD_PROJECT</code>, <code>GOOGLE_CLOUD_LOCATION</code>, <code>GOOGLE_SA_KEY_HOST_PATH</code>, <code>GOOGLE_APPLICATION_CREDENTIALS</code></td>
+<td>Regional Vertex AI for embeddings. <code>gemini-embedding-2</code> (the default) is only served on the Vertex regional endpoint — set the project + point <code>GOOGLE_SA_KEY_HOST_PATH</code> at a service-account key on the host (bind-mounted read-only to <code>/secrets/gcp-sa.json</code>). Leave blank for the api-key path (then use <code>gemini-embedding-001</code>)</td>
+</tr>
+<tr>
+<td><code>SCRAPER_DEFAULT_PINCODE</code>, <code>SCRAPER_MAX_CONCURRENCY</code>, <code>SCRAPER_COLOR_CONCURRENCY</code>, <code>SCRAPER_*_TIMEOUT_MS</code>, <code>SCRAPER_RETRY_MAX</code>, <code>SCRAPER_*_RATE_PER_MIN</code>, <code>SCRAPER_RATE_LIMIT_ENABLED</code>, <code>SCRAPER_JITTER_MS_*</code>, <code>SCRAPER_LISTING_*</code>, <code>SCRAPER_PRICE_SIZE_VARIANTS</code>, <code>SCRAPER_FORCE_AKAMAI_EDGE</code>, <code>SCRAPER_AKAMAI_*</code></td>
+<td>Scraper tunables (full set + defaults in <code>app.env.example</code>)</td>
+</tr>
+<tr>
+<td><code>BETTER_AUTH_SECRET</code></td>
+<td>Better Auth signing secret; auth's <code>DATABASE_STRING</code> is composed from <code>DB_*</code> + <code>DB_NAME_AUTH</code></td>
+</tr>
+<tr>
+<td><code>REQUIRE_EMAIL_VERIFICATION</code>, <code>*_CLIENT_ID/SECRET</code>, <code>AWS_SENDER_EMAIL</code></td>
+<td>Auth OAuth providers + transactional email</td>
+</tr>
+<tr>
+<td><code>NUXT_PUBLIC_ENABLED_SOCIAL_PROVIDERS</code></td>
+<td>Comma-separated providers surfaced in the web UI</td>
+</tr>
+<tr>
+<td><code>AI_PROVIDER</code>, <code>GOOGLE_API_KEY</code>, <code>EMBED_GOOGLE_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, <code>GROQ_API_KEY</code>, <code>TOGETHER_API_KEY</code>, <code>OLLAMA_API_BASE</code></td>
+<td>AI provider selection + keys (only the selected provider's key is read)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>The Nuxt <code>NUXT_PUBLIC_*</code> URLs are passed to the <code>web</code> container at runtime in
+<code>docker-compose.app.yml</code> (see §9), derived from <code>DOMAIN</code>.</p>
+</blockquote>
+<hr />
+<h2 id="appendix-b-security-group-rules">Appendix B — Security Group Rules<a class="headerlink" href="#appendix-b-security-group-rules" title="Permanent link">&para;</a></h2>
+<p><strong>ALB SG</strong></p>
+<table>
+<thead>
+<tr>
+<th>Dir</th>
+<th>Port</th>
+<th>Source / Dest</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>In</td>
+<td>80, 443</td>
+<td><code>0.0.0.0/0</code></td>
+</tr>
+<tr>
+<td>Out</td>
+<td>all</td>
+<td><code>0.0.0.0/0</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>App SG</strong></p>
+<table>
+<thead>
+<tr>
+<th>Dir</th>
+<th>Port</th>
+<th>Source / Dest</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>In</td>
+<td>80</td>
+<td>ALB SG only</td>
+</tr>
+<tr>
+<td>Out</td>
+<td>all</td>
+<td><code>0.0.0.0/0</code> (LLM API, ECR, S3, scraper targets, RDS)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>RDS SG</strong></p>
+<table>
+<thead>
+<tr>
+<th>Dir</th>
+<th>Port</th>
+<th>Source / Dest</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>In</td>
+<td>5432</td>
+<td>App SG only</td>
+</tr>
+<tr>
+<td>Out</td>
+<td>all</td>
+<td><code>0.0.0.0/0</code></td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.highlight", "search.suggest", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
