@@ -1038,9 +1038,19 @@ Levers:
 | `PARITY_CHAT_MODEL` | SM `llm` | no | `anthropic/claude-opus-4-7` |
 | `EMBED_MODEL` / `EMBED_DIMENSIONS` | configmap | no | `gemini-embedding-2` / `1536` |
 | `GEMINI_USE_VERTEX_AI` / `EMBED_USE_VERTEX_AI` | configmap | no | `False` / (inherits) |
+| `GOOGLE_CLOUD_PROJECT` / `GOOGLE_CLOUD_LOCATION` | configmap | no¹ | `""` / `us` |
+| `GOOGLE_APPLICATION_CREDENTIALS` | configmap | no¹ | `/secrets/gcp-sa.json` (rendered only when `vertexServiceAccount.enabled`) |
 | `PARITY_CHAT_CACHE_ENABLED` / `ANTHROPIC_RATIONALES_ENABLED` | configmap | no | `False` |
-| `SCRAPER_DEFAULT_PINCODE` / `SCRAPER_MAX_CONCURRENCY` | configmap | no | `110001` / `3` |
-| `SCRAPER_RATE_LIMIT_ENABLED` / `SCRAPER_LISTING_PARTITION` | configmap | no | `True` |
+| `SCRAPER_DEFAULT_PINCODE` / `SCRAPER_MAX_CONCURRENCY` / `SCRAPER_COLOR_CONCURRENCY` | configmap | no | `110001` / `3` / `3` |
+| `SCRAPER_BROWSER_TIMEOUT_MS` / `SCRAPER_NAVIGATE_TIMEOUT_MS` | configmap | no | `30000` / `20000` |
+| `SCRAPER_RETRY_MAX` / `SCRAPER_DEBUG_ARTIFACTS_ENABLED` | configmap | no | `2` / `true` |
+| `SCRAPER_RATE_LIMIT_ENABLED` / `SCRAPER_FLIPKART_RATE_PER_MIN` / `SCRAPER_DEFAULT_RATE_PER_MIN` | configmap | no | `True` / `30` / `60` |
+| `SCRAPER_JITTER_MS_MIN` / `SCRAPER_JITTER_MS_MAX` | configmap | no | `200` / `800` |
+| `SCRAPER_LISTING_MAX_PAGES` / `SCRAPER_LISTING_PARTITION` / `SCRAPER_PRICE_SIZE_VARIANTS` | configmap | no | `200` / `True` / `true` |
+| `SCRAPER_FORCE_AKAMAI_EDGE` / `SCRAPER_AKAMAI_HOSTS` / `SCRAPER_AKAMAI_FALLBACK_IP` | configmap | no | `false` / (edgekey hosts) / `""` |
+| `SCRAPER_AKAMAI_PROBE_TIMEOUT_S` / `SCRAPER_AKAMAI_CACHE_TTL_S` | configmap | no | `3.0` / `300` |
+
+> ¹ **Regional Vertex embeddings.** The default `EMBED_MODEL=gemini-embedding-2` is only served on the Vertex regional endpoint (the api-key express path 404s for it). To use it, set `config.GOOGLE_CLOUD_PROJECT` and supply a service-account key: create a K8s Secret with data key `gcp-sa.json` (directly, or via ESO from Secrets Manager) and set `vertexServiceAccount.enabled=true` + `vertexServiceAccount.existingSecret=<name>`. The chart mounts it read-only into backend/celery/beat/migrate at `vertexServiceAccount.mountPath` (`/secrets`), and `GOOGLE_APPLICATION_CREDENTIALS` points at `<mountPath>/gcp-sa.json`. For a key-only setup, leave the project blank and use `EMBED_MODEL=gemini-embedding-001`.
 
 ### Web
 
