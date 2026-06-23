@@ -419,8 +419,9 @@ Authoritative template: [`deploy/ec2/app.env.example`](../deploy/ec2/app.env.exa
 | `DB_HOST/PORT/USER/PASSWORD/NAME` | RDS connection (`DB_NAME_AUTH` = `auth`); `PARITY_CHAT_DB_*` for the parity-chat read connection |
 | `CELERY_BROKER_URL` | `redis://redis:6379/0` (local container); results in Postgres |
 | `AWS_REGION`, `AWS_STORAGE_BUCKET_NAME` | S3 uploads (credentials come from the instance profile) |
-| `EMBED_MODEL`, `EMBED_DIMENSIONS`, `GEMINI_USE_VERTEX_AI`, `PARITY_CHAT_*` | Embedding + parity-chat tuning |
-| `SCRAPER_DEFAULT_PINCODE`, `SCRAPER_MAX_CONCURRENCY`, `SCRAPER_RATE_LIMIT_ENABLED`, `SCRAPER_LISTING_PARTITION` | Scraper tunables |
+| `EMBED_MODEL`, `EMBED_DIMENSIONS`, `GEMINI_USE_VERTEX_AI`, `EMBED_USE_VERTEX_AI`, `PARITY_CHAT_*` | Embedding + parity-chat tuning |
+| `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `GOOGLE_SA_KEY_HOST_PATH`, `GOOGLE_APPLICATION_CREDENTIALS` | Regional Vertex AI for embeddings. `gemini-embedding-2` (the default) is only served on the Vertex regional endpoint — set the project + point `GOOGLE_SA_KEY_HOST_PATH` at a service-account key on the host (bind-mounted read-only to `/secrets/gcp-sa.json`). Leave blank for the api-key path (then use `gemini-embedding-001`) |
+| `SCRAPER_DEFAULT_PINCODE`, `SCRAPER_MAX_CONCURRENCY`, `SCRAPER_COLOR_CONCURRENCY`, `SCRAPER_*_TIMEOUT_MS`, `SCRAPER_RETRY_MAX`, `SCRAPER_*_RATE_PER_MIN`, `SCRAPER_RATE_LIMIT_ENABLED`, `SCRAPER_JITTER_MS_*`, `SCRAPER_LISTING_*`, `SCRAPER_PRICE_SIZE_VARIANTS`, `SCRAPER_FORCE_AKAMAI_EDGE`, `SCRAPER_AKAMAI_*` | Scraper tunables (full set + defaults in `app.env.example`) |
 | `BETTER_AUTH_SECRET` | Better Auth signing secret; auth's `DATABASE_STRING` is composed from `DB_*` + `DB_NAME_AUTH` |
 | `REQUIRE_EMAIL_VERIFICATION`, `*_CLIENT_ID/SECRET`, `AWS_SENDER_EMAIL` | Auth OAuth providers + transactional email |
 | `NUXT_PUBLIC_ENABLED_SOCIAL_PROVIDERS` | Comma-separated providers surfaced in the web UI |

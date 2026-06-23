@@ -62,6 +62,9 @@ output "app_env_snippet" {
     EMBED_DIMENSIONS=1536
     GEMINI_USE_VERTEX_AI=False
     EMBED_USE_VERTEX_AI=
+    GOOGLE_CLOUD_LOCATION=us
+    # For regional Vertex (gemini-embedding-2), also set GOOGLE_CLOUD_PROJECT +
+    # GOOGLE_SA_KEY_HOST_PATH by hand — see app.env.example.
     PARITY_CHAT_CACHE_ENABLED=False
     ANTHROPIC_RATIONALES_ENABLED=False
 

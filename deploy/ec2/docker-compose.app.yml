@@ -83,6 +83,9 @@ services:
     restart: always
     volumes:
       - operator-static:/app/static
+      # Vertex AI service-account key (read-only). GOOGLE_SA_KEY_HOST_PATH unset →
+      # /dev/null is mounted (a harmless no-op when not using Vertex ADC).
+      - ${GOOGLE_SA_KEY_HOST_PATH:-/dev/null}:/secrets/gcp-sa.json:ro
     environment: &backend-env
       DEBUG: ${DEBUG:-False}
       APP_ENV: ${APP_ENV:-PROD}
@@ -117,6 +120,14 @@ services:
       EMBED_DIMENSIONS: ${EMBED_DIMENSIONS:-1536}
       GEMINI_USE_VERTEX_AI: ${GEMINI_USE_VERTEX_AI:-False}
       EMBED_USE_VERTEX_AI: ${EMBED_USE_VERTEX_AI:-}
+      # Regional Vertex AI for embeddings. gemini-embedding-2 (the EMBED_MODEL
+      # default) is only served on the Vertex regional endpoint — set
+      # GOOGLE_CLOUD_PROJECT + supply a service-account key (GOOGLE_SA_KEY_HOST_PATH
+      # below, mounted to GOOGLE_APPLICATION_CREDENTIALS) to use it. Leave blank
+      # for the api-key path (then use gemini-embedding-001).
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-}
+      GOOGLE_CLOUD_LOCATION: ${GOOGLE_CLOUD_LOCATION:-us}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
       PARITY_CHAT_CACHE_ENABLED: ${PARITY_CHAT_CACHE_ENABLED:-False}
       ANTHROPIC_RATIONALES_ENABLED: ${ANTHROPIC_RATIONALES_ENABLED:-False}
       PARITY_CHAT_MODEL: ${PARITY_CHAT_MODEL:-anthropic/claude-opus-4-7}
@@ -132,8 +143,24 @@ services:
       # Scraper tunables.
       SCRAPER_DEFAULT_PINCODE: ${SCRAPER_DEFAULT_PINCODE:-110001}
       SCRAPER_MAX_CONCURRENCY: ${SCRAPER_MAX_CONCURRENCY:-3}
+      SCRAPER_COLOR_CONCURRENCY: ${SCRAPER_COLOR_CONCURRENCY:-3}
+      SCRAPER_BROWSER_TIMEOUT_MS: ${SCRAPER_BROWSER_TIMEOUT_MS:-30000}
+      SCRAPER_NAVIGATE_TIMEOUT_MS: ${SCRAPER_NAVIGATE_TIMEOUT_MS:-20000}
+      SCRAPER_DEBUG_ARTIFACTS_ENABLED: ${SCRAPER_DEBUG_ARTIFACTS_ENABLED:-true}
+      SCRAPER_RETRY_MAX: ${SCRAPER_RETRY_MAX:-2}
+      SCRAPER_FLIPKART_RATE_PER_MIN: ${SCRAPER_FLIPKART_RATE_PER_MIN:-30}
+      SCRAPER_DEFAULT_RATE_PER_MIN: ${SCRAPER_DEFAULT_RATE_PER_MIN:-60}
       SCRAPER_RATE_LIMIT_ENABLED: ${SCRAPER_RATE_LIMIT_ENABLED:-True}
+      SCRAPER_JITTER_MS_MIN: ${SCRAPER_JITTER_MS_MIN:-200}
+      SCRAPER_JITTER_MS_MAX: ${SCRAPER_JITTER_MS_MAX:-800}
+      SCRAPER_LISTING_MAX_PAGES: ${SCRAPER_LISTING_MAX_PAGES:-200}
       SCRAPER_LISTING_PARTITION: ${SCRAPER_LISTING_PARTITION:-True}
+      SCRAPER_PRICE_SIZE_VARIANTS: ${SCRAPER_PRICE_SIZE_VARIANTS:-true}
+      SCRAPER_FORCE_AKAMAI_EDGE: ${SCRAPER_FORCE_AKAMAI_EDGE:-false}
+      SCRAPER_AKAMAI_HOSTS: ${SCRAPER_AKAMAI_HOSTS:-www.flipkart.com.edgekey.net,e348826.dscb.akamaiedge.net}
+      SCRAPER_AKAMAI_FALLBACK_IP: ${SCRAPER_AKAMAI_FALLBACK_IP:-}
+      SCRAPER_AKAMAI_PROBE_TIMEOUT_S: ${SCRAPER_AKAMAI_PROBE_TIMEOUT_S:-3.0}
+      SCRAPER_AKAMAI_CACHE_TTL_S: ${SCRAPER_AKAMAI_CACHE_TTL_S:-300}
     depends_on:
       redis:
         condition: service_healthy
@@ -157,6 +184,8 @@ services:
       - --concurrency=4
       - --hostname=default@%h
     restart: always
+    volumes:
+      - ${GOOGLE_SA_KEY_HOST_PATH:-/dev/null}:/secrets/gcp-sa.json:ro
     environment: *backend-env
     depends_on:
       redis:
@@ -184,6 +213,8 @@ services:
       - --soft-time-limit=600
     restart: always
     shm_size: "1gb"
+    volumes:
+      - ${GOOGLE_SA_KEY_HOST_PATH:-/dev/null}:/secrets/gcp-sa.json:ro
     environment:
       <<: *backend-env
       HOME: /tmp
@@ -205,6 +236,8 @@ services:
       - --loglevel=INFO
       - --scheduler=django_celery_beat.schedulers:DatabaseScheduler
     restart: always
+    volumes:
+      - ${GOOGLE_SA_KEY_HOST_PATH:-/dev/null}:/secrets/gcp-sa.json:ro
     environment: *backend-env
     depends_on:
       redis:
@@ -274,6 +307,8 @@ services:
     image: ${ECR_REGISTRY}/cart-iq/backend:${BACKEND_TAG}
     profiles: ["tools"]
     command: ["python", "manage.py", "migrate", "--noinput"]
+    volumes:
+      - ${GOOGLE_SA_KEY_HOST_PATH:-/dev/null}:/secrets/gcp-sa.json:ro
     environment: *backend-env
 
 networks:

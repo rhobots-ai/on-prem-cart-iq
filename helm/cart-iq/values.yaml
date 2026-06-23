@@ -147,6 +147,16 @@ config:
   EMBED_DIMENSIONS: "1536"
   GEMINI_USE_VERTEX_AI: "False"
   EMBED_USE_VERTEX_AI: ""         # blank → inherits GEMINI_USE_VERTEX_AI
+  # Regional Vertex AI for embeddings. The EMBED_MODEL default (gemini-embedding-2)
+  # is only served on the Vertex regional endpoint — set GOOGLE_CLOUD_PROJECT and
+  # supply a service-account key via the `vertexServiceAccount` block below
+  # (mounted at GOOGLE_APPLICATION_CREDENTIALS). Leave the project blank for the
+  # api-key path (then set EMBED_MODEL: gemini-embedding-001).
+  GOOGLE_CLOUD_PROJECT: ""        # GCP project for ADC/Vertex; blank → api-key path
+  GOOGLE_CLOUD_LOCATION: "us"
+  # GOOGLE_APPLICATION_CREDENTIALS is NOT set here — it is derived in the ConfigMap
+  # from vertexServiceAccount.mountPath (only when vertexServiceAccount.enabled), so
+  # the path always tracks the actual mount. Change the mount via that block, not here.
   PARITY_CHAT_CACHE_ENABLED: "False"
   ANTHROPIC_RATIONALES_ENABLED: "False"
   # Scraper tunables (Playwright/Flipkart). Defaults match the app; override
@@ -154,12 +164,43 @@ config:
   # app's built-in defaults in config/settings.py.
   SCRAPER_DEFAULT_PINCODE: "110001"
   SCRAPER_MAX_CONCURRENCY: "3"    # also feeds celery scraper worker -c
+  SCRAPER_COLOR_CONCURRENCY: "3"
+  SCRAPER_BROWSER_TIMEOUT_MS: "30000"
+  SCRAPER_NAVIGATE_TIMEOUT_MS: "20000"
+  SCRAPER_DEBUG_ARTIFACTS_ENABLED: "true"
+  SCRAPER_RETRY_MAX: "2"
+  SCRAPER_FLIPKART_RATE_PER_MIN: "30"
+  SCRAPER_DEFAULT_RATE_PER_MIN: "60"
   SCRAPER_RATE_LIMIT_ENABLED: "True"
+  SCRAPER_JITTER_MS_MIN: "200"
+  SCRAPER_JITTER_MS_MAX: "800"
+  SCRAPER_LISTING_MAX_PAGES: "200"
   SCRAPER_LISTING_PARTITION: "True"
+  SCRAPER_PRICE_SIZE_VARIANTS: "true"   # true clicks every size/colour (slow); false = labels only
+  SCRAPER_FORCE_AKAMAI_EDGE: "false"    # true on hosts blackholing Flipkart-origin (some AWS Mumbai subnets)
+  SCRAPER_AKAMAI_HOSTS: "www.flipkart.com.edgekey.net,e348826.dscb.akamaiedge.net"
+  SCRAPER_AKAMAI_FALLBACK_IP: ""
+  SCRAPER_AKAMAI_PROBE_TIMEOUT_S: "3.0"
+  SCRAPER_AKAMAI_CACHE_TTL_S: "300"
   # Auto-derived from global.domain if blank:
   ALLOWED_HOSTS: ""               # default: <domain>
   CSRF_TRUSTED_ORIGINS: ""        # default: https://<domain>
   HOST_NAME: ""                   # default: https://<domain>
+
+# -----------------------------------------------------------------------------
+# Vertex AI service-account key — optional. Required only when embeddings use
+# regional Vertex (config.GOOGLE_CLOUD_PROJECT set + gemini-embedding-2). The key
+# is mounted read-only into backend/celery/beat/migrate pods at
+# <mountPath>/gcp-sa.json, which config.GOOGLE_APPLICATION_CREDENTIALS points at.
+# Provide the key as a K8s Secret holding the data key `gcp-sa.json` — create it
+# directly (kubectl create secret generic ... --from-file=gcp-sa.json=...) or
+# project it via ESO from Secrets Manager. Disabled by default; key-only
+# deployments are unaffected.
+# -----------------------------------------------------------------------------
+vertexServiceAccount:
+  enabled: false
+  existingSecret: ""              # name of a Secret with data key `gcp-sa.json`
+  mountPath: /secrets
 
 # -----------------------------------------------------------------------------
 # Per-workload sections

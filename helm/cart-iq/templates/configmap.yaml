@@ -23,10 +23,35 @@ data:
   EMBED_DIMENSIONS: {{ .Values.config.EMBED_DIMENSIONS | quote }}
   GEMINI_USE_VERTEX_AI: {{ .Values.config.GEMINI_USE_VERTEX_AI | quote }}
   EMBED_USE_VERTEX_AI: {{ .Values.config.EMBED_USE_VERTEX_AI | quote }}
+  {{- with .Values.config.GOOGLE_CLOUD_PROJECT }}
+  GOOGLE_CLOUD_PROJECT: {{ . | quote }}
+  {{- end }}
+  GOOGLE_CLOUD_LOCATION: {{ .Values.config.GOOGLE_CLOUD_LOCATION | quote }}
+  {{- if .Values.vertexServiceAccount.enabled }}
+  GOOGLE_APPLICATION_CREDENTIALS: {{ printf "%s/gcp-sa.json" .Values.vertexServiceAccount.mountPath | quote }}
+  {{- end }}
   PARITY_CHAT_CACHE_ENABLED: {{ .Values.config.PARITY_CHAT_CACHE_ENABLED | quote }}
   ANTHROPIC_RATIONALES_ENABLED: {{ .Values.config.ANTHROPIC_RATIONALES_ENABLED | quote }}
   # Scraper tunables.
   SCRAPER_DEFAULT_PINCODE: {{ .Values.config.SCRAPER_DEFAULT_PINCODE | quote }}
   SCRAPER_MAX_CONCURRENCY: {{ .Values.config.SCRAPER_MAX_CONCURRENCY | quote }}
+  SCRAPER_COLOR_CONCURRENCY: {{ .Values.config.SCRAPER_COLOR_CONCURRENCY | quote }}
+  SCRAPER_BROWSER_TIMEOUT_MS: {{ .Values.config.SCRAPER_BROWSER_TIMEOUT_MS | quote }}
+  SCRAPER_NAVIGATE_TIMEOUT_MS: {{ .Values.config.SCRAPER_NAVIGATE_TIMEOUT_MS | quote }}
+  SCRAPER_DEBUG_ARTIFACTS_ENABLED: {{ .Values.config.SCRAPER_DEBUG_ARTIFACTS_ENABLED | quote }}
+  SCRAPER_RETRY_MAX: {{ .Values.config.SCRAPER_RETRY_MAX | quote }}
+  SCRAPER_FLIPKART_RATE_PER_MIN: {{ .Values.config.SCRAPER_FLIPKART_RATE_PER_MIN | quote }}
+  SCRAPER_DEFAULT_RATE_PER_MIN: {{ .Values.config.SCRAPER_DEFAULT_RATE_PER_MIN | quote }}
   SCRAPER_RATE_LIMIT_ENABLED: {{ .Values.config.SCRAPER_RATE_LIMIT_ENABLED | quote }}
+  SCRAPER_JITTER_MS_MIN: {{ .Values.config.SCRAPER_JITTER_MS_MIN | quote }}
+  SCRAPER_JITTER_MS_MAX: {{ .Values.config.SCRAPER_JITTER_MS_MAX | quote }}
+  SCRAPER_LISTING_MAX_PAGES: {{ .Values.config.SCRAPER_LISTING_MAX_PAGES | quote }}
   SCRAPER_LISTING_PARTITION: {{ .Values.config.SCRAPER_LISTING_PARTITION | quote }}
+  SCRAPER_PRICE_SIZE_VARIANTS: {{ .Values.config.SCRAPER_PRICE_SIZE_VARIANTS | quote }}
+  SCRAPER_FORCE_AKAMAI_EDGE: {{ .Values.config.SCRAPER_FORCE_AKAMAI_EDGE | quote }}
+  SCRAPER_AKAMAI_HOSTS: {{ .Values.config.SCRAPER_AKAMAI_HOSTS | quote }}
+  {{- with .Values.config.SCRAPER_AKAMAI_FALLBACK_IP }}
+  SCRAPER_AKAMAI_FALLBACK_IP: {{ . | quote }}
+  {{- end }}
+  SCRAPER_AKAMAI_PROBE_TIMEOUT_S: {{ .Values.config.SCRAPER_AKAMAI_PROBE_TIMEOUT_S | quote }}
+  SCRAPER_AKAMAI_CACHE_TTL_S: {{ .Values.config.SCRAPER_AKAMAI_CACHE_TTL_S | quote }}
