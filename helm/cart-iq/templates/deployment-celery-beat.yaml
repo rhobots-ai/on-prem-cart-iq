@@ -50,8 +50,21 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.vertexServiceAccount.enabled }}
+            - name: vertex-sa
+              mountPath: {{ .Values.vertexServiceAccount.mountPath }}
+              readOnly: true
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir:
             sizeLimit: 64Mi
+        {{- if .Values.vertexServiceAccount.enabled }}
+        - name: vertex-sa
+          secret:
+            secretName: {{ required "vertexServiceAccount.existingSecret is required when vertexServiceAccount.enabled=true" .Values.vertexServiceAccount.existingSecret }}
+            items:
+              - key: gcp-sa.json
+                path: gcp-sa.json
+        {{- end }}
 {{- end }}
